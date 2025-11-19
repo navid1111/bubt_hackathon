@@ -1,7 +1,7 @@
 import express from 'express';
 import config from './config/app';
 import baseMiddleware from './middleware';
-import foodRouter from '../modules/foods/food-router';
+import foodRouter from './modules/foods/food-router'
 
 const app = express();
 
