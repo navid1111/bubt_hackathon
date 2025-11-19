@@ -1,31 +1,28 @@
-import express from 'express';
+import express, { Application } from 'express';
 import config from './config/app';
-import baseMiddleware from './middleware';
-import foodRouter from './modules/foods/food-router'
+import router from './router';
 
-const app = express();
+const app: Application = express();
 
-// Apply base middleware
-app.use(...baseMiddleware);
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Register routes
-app.use('/api/foods', foodRouter);  // Food items routes
-
-// Basic route for testing
-app.get('/', (req, res) => {
-  res.json({ message: 'Food Waste Management Backend API', version: '1.0.0' });
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
+// Routes
+app.use('/api', router);
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
+app.use(
+  (
+    err: Error,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
+  },
+);
 
 // 404 handler
 app.use((req, res) => {
