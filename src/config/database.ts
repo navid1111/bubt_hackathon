@@ -1,22 +1,24 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 
-const connectionString = process.env.DATABASE_URL!;
+let prisma: PrismaClient;
 
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-
-// Create a single instance of PrismaClient
-const prisma = new PrismaClient({
-  adapter,
-  log: ['query', 'info', 'warn', 'error'],
-});
+// Check if we're in production
+if (process.env.NODE_ENV === 'production') {
+  prisma = new PrismaClient();
+} else {
+  // In development, use a global instance to prevent hot-reload issues
+  const globalWithPrisma = global as typeof global & {
+    prisma: PrismaClient;
+  };
+  
+  if (!globalWithPrisma.prisma) {
+    globalWithPrisma.prisma = new PrismaClient();
+  }
+  
+  prisma = globalWithPrisma.prisma;
+}
 
 export default prisma;
 
-// Optional: export a function to close the connection
-export const disconnect = async () => {
-  await prisma.$disconnect();
-  await pool.end();
-};
+// Export the PrismaClient type for use in other files
+export { PrismaClient };
