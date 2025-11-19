@@ -1,5 +1,6 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 import prisma from './config/database';
+import router from './router';
 
 const app: Application = express();
 
@@ -8,18 +9,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Welcome to the Food Waste Management API!' });
-});
-
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'Food Waste Management API is running',
-    timestamp: new Date().toISOString()
-  });
-});
+app.use('/api', router);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
