@@ -36,10 +36,10 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.0.0",
-    "@prisma/client": "^7.0.0",
+    "@prisma/adapter-pg": "^6.15.0",
+    "@prisma/client": "^6.15.0",
     "express": "^5.1.0",
     "pg": "^8.16.3",
-    "prisma": "^7.0.0"
+    "prisma": "^6.15.0"
   }
 }
