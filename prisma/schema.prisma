@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 String          @id @default(uuid())
+  clerkId            String          @unique
+  email              String?         @unique
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  isDeleted          Boolean         @default(false)
+  deletedAt          DateTime?
+
+  profile            UserProfile?
+  files              File[]          @relation("UserFiles")
+  foodItemsCreated   FoodItem[]      @relation("CreatedFoodItems")
+  inventoriesCreated Inventory[]     @relation("CreatedInventories")
+  addedMembers       InventoryMember[] @relation("AddedInventoryMembers")
+  inventoryItemsAdded InventoryItem[] @relation("AddedInventoryItems")
+  inventoryMembers   InventoryMember[] @relation("UserInventoryMembers")
+}
+
+model UserProfile {
+  id                String            @id @default(uuid())
+  user              User              @relation(fields: [userId], references: [id])
+  userId            String            @unique
+  fullName          String?
+  dietaryPreference String?
+  location          String?
+  budgetRange       Float?
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  isDeleted         Boolean           @default(false)
+  deletedAt         DateTime?
+}
+
+model FoodItem {
+  id                    String          @id @default(uuid())
+  name                  String
+  unit                  String?
+  typicalExpirationDays Int?
+  sampleCostPerUnit     Float?
+  description           String?
+  createdBy             User?           @relation("CreatedFoodItems", fields: [createdById], references: [id])
+  createdById           String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  isDeleted             Boolean         @default(false)
+  deletedAt             DateTime?
+
+  inventoryItems        InventoryItem[]
+  consumptionLogs       ConsumptionLog[] @relation("FoodItemConsumptions")
+  files                 File[]          @relation("FoodItemFiles")
+}
+
+model Inventory {
+  id           String           @id @default(uuid())
+  name         String
+  description  String?
+  createdBy    User?            @relation("CreatedInventories", fields: [createdById], references: [id])
+  createdById  String?
+  isPrivate    Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  isDeleted    Boolean          @default(false)
+  deletedAt    DateTime?
+
+  members      InventoryMember[] @relation("InventoryMembers")
+  items        InventoryItem[]   @relation("InventoryItems")
+  consumption  ConsumptionLog[]  @relation("InventoryConsumptions")
+  files        File[]          @relation("InventoryFiles")
+}
+
+model InventoryMember {
+  id            String             @id @default(uuid())
+  inventory     Inventory          @relation("InventoryMembers", fields: [inventoryId], references: [id])
+  inventoryId   String
+  user          User?              @relation("UserInventoryMembers", fields: [userId], references: [id])
+  userId        String?
+  memberName    String?
+  role          String
+  joinedAt      DateTime           @default(now())
+  addedBy       User?              @relation("AddedInventoryMembers", fields: [addedById], references: [id])
+  addedById     String?
+  isDeleted     Boolean            @default(false)
+  deletedAt     DateTime?
+
+  consumptionLogs ConsumptionLog[] @relation("MemberConsumptions")
+}
+
+model InventoryItem {
+  id                 String       @id @default(uuid())
+  inventory          Inventory    @relation("InventoryItems", fields: [inventoryId], references: [id])
+  inventoryId        String
+  foodItem           FoodItem?    @relation(fields: [foodItemId], references: [id])
+  foodItemId         String?
+  customName         String?
+  quantity           Float        @default(0)
+  unit               String?
+  addedAt            DateTime     @default(now())
+  expiryDate         DateTime?
+  removed            Boolean      @default(false)
+  notes              String?
+  addedBy            User?        @relation("AddedInventoryItems", fields: [addedById], references: [id])
+  addedById          String?
+  updatedAt          DateTime     @updatedAt
+  isDeleted          Boolean      @default(false)
+  deletedAt          DateTime?
+
+  files              File[]       @relation("InventoryItemFiles")
+  consumptionLogs    ConsumptionLog[] @relation("InventoryItemConsumptions")
+}
+
+model ConsumptionLog {
+  id               String            @id @default(uuid())
+  inventory        Inventory         @relation("InventoryConsumptions", fields: [inventoryId], references: [id])
+  inventoryId      String
+  inventoryItem    InventoryItem?    @relation("InventoryItemConsumptions", fields: [inventoryItemId], references: [id])
+  inventoryItemId  String?
+  consumedBy       InventoryMember?  @relation("MemberConsumptions", fields: [consumedById], references: [id])
+  consumedById     String?
+  foodItem         FoodItem?         @relation("FoodItemConsumptions", fields: [foodItemId], references: [id])
+  foodItemId       String?
+  itemName         String
+  quantity         Float
+  unit             String?
+  consumedAt       DateTime          @default(now())
+  notes            String?
+  isDeleted        Boolean           @default(false)
+  deletedAt        DateTime?
+}
+
+model Resource {
+  id           String        @id @default(uuid())
+  title        String
+  description  String
+  url          String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  isDeleted    Boolean       @default(false)
+  deletedAt    DateTime?
+}
+
+model File {
+  id               String        @id @default(uuid())
+  user             User?         @relation("UserFiles", fields: [userId], references: [id])
+  userId           String?
+  url              String
+  filename         String?
+  mimeType         String?
+  size             Int?
+
+  foodItem         FoodItem?     @relation("FoodItemFiles", fields: [foodItemId], references: [id])
+  foodItemId       String?
+  inventory        Inventory?    @relation("InventoryFiles", fields: [inventoryId], references: [id])
+  inventoryId      String?
+  inventoryItem    InventoryItem? @relation("InventoryItemFiles", fields: [inventoryItemId], references: [id])
+  inventoryItemId  String?
+
+  createdAt        DateTime      @default(now())
+  isDeleted        Boolean       @default(false)
+  deletedAt        DateTime?
+}
