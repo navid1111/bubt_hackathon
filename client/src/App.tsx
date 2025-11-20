@@ -1,6 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import Home from './pages/Home';
+import FoodPage from './pages/FoodPage'
+import Dashboard from './pages/Dashboard';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -17,27 +19,32 @@ import DailyLogPage from './pages/DailyLogPage';
 // import NeighbourhoodPage from './pages/NeighbourhoodPage';
 import ProfilePage from './pages/ProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
+import { ProfileProvider } from './context/ProfileContext';
+import { ResourcesPage } from './pages/resources-page';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
 
 export default function App() {
   return (
-    <ProfileProvider>
-      <Routes>
-        {/* Public routes (no layout) */}
-        <Route path="/" element={<Home />} />
-        <Route path="/sign-in" element={<SignInPage />} />
-        <Route path="/sign-up" element={<SignUpPage />} />
-        
-        {/* Onboarding (no layout) */}
-        <Route
-          path="/onboarding"
-          element={
-            <SignedIn>
-              <OnboardingPage />
-            </SignedIn>
-          }
-        />
+    <QueryClientProvider client={queryClient}>
+      <ProfileProvider>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/sign-in" element={<SignInPage />} />
+          <Route path="/sign-up" element={<SignUpPage />} />
 
-        {/* Protected routes with layout */}
+          {/* Protected routes */}
+          <Route
+            path="/onboarding"
+            element={
+              <SignedIn>
+                <OnboardingPage />
+              </SignedIn>
+            }
+          />
+          {/* Protected routes with layout */}
         <Route
           path="/"
           element={
@@ -55,16 +62,17 @@ export default function App() {
           <Route path="profile/edit" element={<EditProfilePage />} />
         </Route>
 
-        {/* Redirect to sign in when signed out */}
-        <Route
-          path="*"
-          element={
-            <SignedOut>
-              <RedirectToSignIn />
-            </SignedOut>
-          }
-        />
-      </Routes>
-    </ProfileProvider>
+          {/* Redirect to sign in when signed out */}
+          <Route
+            path="*"
+            element={
+              <SignedOut>
+                <RedirectToSignIn />
+              </SignedOut>
+            }
+          />
+        </Routes>
+      </ProfileProvider>
+    </QueryClientProvider>
   );
 }
