@@ -1,17 +1,12 @@
 import express from "express";
+import { resourcesController } from "./resources-controller";
     
 const router = express.Router();
 
 
-router.get("/", (req, res) => {
-    // complete implementation
-    res.json({ message: "List of resources", data: [] });
-});
+router.get("/", resourcesController.getAllResources);
 
-router.get("/:id", (req, res) => {
-    // complete implementation
-    res.json({ message: `Details for resource ${req.params.id}`, data: {} });
-});
+router.get("/:id", resourcesController.getResourceById);
 
 router.post("/", (req, res) => {
     // complete implementation
