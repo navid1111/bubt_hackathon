@@ -186,28 +186,28 @@ async function main() {
   console.log(`Seeded ${foodItems.count} food items`);
 
   // Create sample Resource entries
-  const resources = await prisma.resource.createMany({
-    data: [
-      {
-        title: 'Food Storage Tips',
-        description: 'Best practices for storing food to reduce waste',
-        url: 'https://example.com/food-storage-tips',
-      },
-      {
-        title: 'Meal Planning Guide',
-        description: 'How to plan meals effectively to minimize waste',
-        url: 'https://example.com/meal-planning',
-      },
-      {
-        title: 'Waste Reduction Techniques',
-        description: 'Methods to reduce food waste at home',
-        url: 'https://example.com/waste-reduction',
-      }
-    ],
-    skipDuplicates: true,
-  });
+  // const resources = await prisma.resource.createMany({
+  //   data: [
+  //     {
+  //       title: 'Food Storage Tips',
+  //       description: 'Best practices for storing food to reduce waste',
+  //       url: 'https://example.com/food-storage-tips',
+  //     },
+  //     {
+  //       title: 'Meal Planning Guide',
+  //       description: 'How to plan meals effectively to minimize waste',
+  //       url: 'https://example.com/meal-planning',
+  //     },
+  //     {
+  //       title: 'Waste Reduction Techniques',
+  //       description: 'Methods to reduce food waste at home',
+  //       url: 'https://example.com/waste-reduction',
+  //     }
+  //   ],
+  //   skipDuplicates: true,
+  // });
 
-  console.log(`Seeded ${resources.count} resources`);
+  // console.log(`Seeded ${resources.count} resources`);
 
   // Create sample user
   const user = await prisma.user.upsert({
