@@ -2,25 +2,20 @@ import { Routes, Route } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import Home from './pages/Home';
 import FoodPage from './pages/FoodPage'
-import Dashboard from './pages/Dashboard';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import OnboardingPage from './pages/OnboardingPage';
-import { ProfileProvider } from './context/ProfileContext';
-
 // Layout
 import Layout from './components/Layout';
 
 // Pages with Layout
 import Dashboard from './pages/Dashboard';
 import DailyLogPage from './pages/DailyLogPage';
-// import InventoryPage from './pages/InventoryPage';
-// import ResourcesPage from './pages/ResourcesPage';
-// import NeighbourhoodPage from './pages/NeighbourhoodPage';
+import NeighbourhoodPage from './pages/NeighbourhoodPage';
 import ProfilePage from './pages/ProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
 import { ProfileProvider } from './context/ProfileContext';
-import { ResourcesPage } from './pages/resources-page';
+import { ResourcesPage } from './pages/ResourcesPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient();
@@ -55,9 +50,9 @@ export default function App() {
         >
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="daily-log" element={<DailyLogPage />} />
-          {/* <Route path="inventory" element={<InventoryPage />} />
+          <Route path="inventory" element={<FoodPage />} />
           <Route path="resources" element={<ResourcesPage />} />
-          <Route path="neighbourhood" element={<NeighbourhoodPage />} /> */}
+          <Route path="neighbourhood" element={<NeighbourhoodPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/edit" element={<EditProfilePage />} />
         </Route>
