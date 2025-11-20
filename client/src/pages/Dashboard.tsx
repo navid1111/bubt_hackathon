@@ -1,9 +1,30 @@
-import { UserButton, useUser } from '@clerk/clerk-react'
-import { Link } from 'react-router-dom'
-import { Leaf, Home, BarChart3, Users, Settings } from 'lucide-react'
+import { useEffect } from 'react';
+import { UserButton } from '@clerk/clerk-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Leaf, Home, BarChart3, Users, Settings, User } from 'lucide-react';
+import { useProfile } from '../context/ProfileContext';
 
 export default function Dashboard() {
-  const { user } = useUser()
+  const navigate = useNavigate();
+  const { profile, loading, isOnboarded } = useProfile();
+
+  // Redirect to onboarding if profile is incomplete
+  useEffect(() => {
+    if (!loading && !isOnboarded) {
+      navigate('/onboarding');
+    }
+  }, [loading, isOnboarded, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-foreground/70">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -19,24 +40,31 @@ export default function Dashboard() {
             </Link>
 
             <div className="flex items-center gap-4">
+              <Link
+                to="/profile"
+                className="hidden sm:flex items-center gap-2 px-4 py-2 text-foreground/80 hover:text-primary hover:bg-primary/5 rounded-lg transition-smooth"
+              >
+                <User className="w-4 h-4" />
+                <span className="text-sm font-medium">Profile</span>
+              </Link>
               <span className="text-sm text-foreground/70 hidden sm:inline">
-                Welcome, {user?.firstName || 'User'}!
+                Welcome, {profile?.profile?.fullName || 'User'}!
               </span>
-              <UserButton 
+              <UserButton
                 afterSignOutUrl="/"
                 appearance={{
                   elements: {
-                    avatarBox: "w-10 h-10",
-                    userButtonPopoverCard: "bg-card border border-border",
-                    userButtonPopoverActionButton: "hover:bg-secondary/10 text-foreground",
-                    userButtonPopoverActionButtonText: "text-foreground",
-                    userButtonPopoverActionButtonIcon: "text-foreground/70",
-                    userButtonPopoverFooter: "hidden",
+                    avatarBox: 'w-10 h-10',
+                    userButtonPopoverCard: 'bg-card border border-border',
+                    userButtonPopoverActionButton: 'hover:bg-secondary/10 text-foreground',
+                    userButtonPopoverActionButtonText: 'text-foreground',
+                    userButtonPopoverActionButtonIcon: 'text-foreground/70',
+                    userButtonPopoverFooter: 'hidden',
                   },
                   variables: {
-                    colorPrimary: "#16803C",
-                    colorBackground: "#ffffff",
-                  }
+                    colorPrimary: '#16803C',
+                    colorBackground: '#ffffff',
+                  },
                 }}
               />
             </div>
@@ -104,9 +132,7 @@ export default function Dashboard() {
 
         {/* Getting Started Section */}
         <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl border border-border p-8">
-          <h2 className="text-2xl font-bold text-foreground mb-4">
-            Welcome to NutriTrack! 🌱
-          </h2>
+          <h2 className="text-2xl font-bold text-foreground mb-4">Welcome to NutriTrack! 🌱</h2>
           <p className="text-foreground/70 mb-6">
             Start tracking your food consumption and reduce waste. Here are some quick actions to get you started:
           </p>
@@ -117,9 +143,12 @@ export default function Dashboard() {
             <button className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-smooth font-medium">
               Set Your Goals
             </button>
-            <button className="px-6 py-3 bg-card border border-border text-foreground rounded-lg hover:bg-secondary/10 transition-smooth font-medium">
-              Join a Community
-            </button>
+            <Link
+              to="/profile"
+              className="px-6 py-3 bg-card border border-border text-foreground rounded-lg hover:bg-secondary/10 transition-smooth font-medium text-center"
+            >
+              View Profile
+            </Link>
           </div>
         </div>
 
@@ -132,5 +161,5 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-  )
+  );
 }
