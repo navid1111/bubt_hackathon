@@ -1,29 +1,30 @@
-import { Request, Response, NextFunction } from 'express';
 
-// Request logging middleware
-export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-};
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
 
-// Error handling middleware
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: err.message 
-  });
-};
+// Base middleware configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS;
+const corsOptions = allowedOrigins === '*'
+  ? { origin: true, credentials: true }
+  : { origin: allowedOrigins?.split(','), credentials: true };
 
-// CORS middleware (simplified)
-export const cors = (req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-};
+const baseMiddleware = [
+  // Security middleware
+  helmet(),
+
+  // Enable CORS for all routes
+  cors(corsOptions),
+
+  // Enable compression
+  compression(),
+
+  // Parse JSON bodies
+  express.json({ limit: '10mb' }),
+
+  // Parse URL-encoded bodies
+  express.urlencoded({ extended: true, limit: '10mb' }),
+];
+
+export default baseMiddleware;

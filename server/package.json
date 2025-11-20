@@ -11,7 +11,11 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "repository": {
     "type": "git",
@@ -26,11 +30,15 @@
   },
   "homepage": "https://github.com/navid1111/bubt_hackathon#readme",
   "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
+    "@types/helmet": "^0.0.48",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.6",
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
+    "prisma": "^5.0.0",
     "supertest": "^7.1.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
@@ -39,6 +47,7 @@
     "@prisma/adapter-pg": "^6.15.0",
     "@prisma/client": "^6.15.0",
     "express": "^5.1.0",
+    "helmet": "^8.1.0",
     "pg": "^8.16.3",
     "prisma": "^6.15.0"
   }
