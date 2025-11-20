@@ -1,10 +1,11 @@
-import app from './server';
-import { config } from './config/app';
-import prisma from './config/database';
-import { requestLogger } from './middleware';
 
-// Add request logging middleware
-app.use(requestLogger);
+import app from './server';
+import config from './config/app';
+import prisma from './config/database';
+import baseMiddleware from './middleware';
+
+// Add base middleware
+baseMiddleware.forEach(mw => app.use(mw));
 
 const startServer = async () => {
   try {

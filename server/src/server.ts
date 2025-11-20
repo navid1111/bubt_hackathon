@@ -1,40 +1,42 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
-import prisma from './config/database';
+import express from 'express';
+import config from './config/app';
+import baseMiddleware from './middleware';
+import foodRouter from '../modules/foods/food-router';
 
-const app: Application = express();
+const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Apply base middleware
+app.use(...baseMiddleware);
 
-// Routes
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Welcome to the Food Waste Management API!' });
+// Register routes
+app.use('/api/foods', foodRouter);  // Food items routes
+
+// Basic route for testing
+app.get('/', (req, res) => {
+  res.json({ message: 'Food Waste Management Backend API', version: '1.0.0' });
 });
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'Food Waste Management API is running',
-    timestamp: new Date().toISOString()
-  });
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: err.message 
-  });
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Shutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Start server
+const server = app.listen(config.port, () => {
+  console.log(`Server running on port ${config.port}`);
+  console.log(`Environment: ${config.nodeEnv}`);
 });
 
 export default app;
+export { server };
