@@ -1,5 +1,5 @@
 import express, { Application } from 'express';
-import config from './config/app';
+import cors from 'cors';
 import router from './router';
 
 const app: Application = express();
@@ -7,6 +7,10 @@ const app: Application = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 
 // Routes
 app.use('/api', router);
@@ -29,11 +33,4 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Start server
-const server = app.listen(config.port, () => {
-  console.log(`Server running on port ${config.port}`);
-  console.log(`Environment: ${config.nodeEnv}`);
-});
-
 export default app;
-export { server };
