@@ -5,6 +5,11 @@ const getAllResources = async () => {
     return resources;
 };
 
+const getAllResourceTags = async () => {
+    const tags = await resourcesRepository.getAllResourceTags();
+    return tags;
+};
+
 const getResourceById = async (id: string) => {
     const resource = await resourcesRepository.getResourceById(id);
     return resource;
@@ -12,5 +17,6 @@ const getResourceById = async (id: string) => {
 
 export const resourcesService = {
     getAllResources,
+    getAllResourceTags,
     getResourceById,
 };

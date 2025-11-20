@@ -131,15 +131,41 @@ model ConsumptionLog {
   inventoryItem   InventoryItem?   @relation("InventoryItemConsumptions", fields: [inventoryItemId], references: [id])
 }
 
+enum ResourceType {
+  Article
+  Video
+}
+
 model Resource {
   id          String    @id @default(uuid())
   title       String
-  description String
+  description String?
   url         String?
+  type        ResourceType
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   isDeleted   Boolean   @default(false)
   deletedAt   DateTime?
+  tags        ResourceTagOnResource[]
+}
+
+model ResourceTag {
+  id         String   @id @default(uuid())
+  tag        String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+  deletedAt  DateTime?
+  resources  ResourceTagOnResource[]
+}
+
+model ResourceTagOnResource {
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  tagId      String
+  tag        ResourceTag @relation(fields: [tagId], references: [id])
+  createdAt  DateTime @default(now())
+  @@id([resourceId, tagId])
 }
 
 model File {

@@ -6,6 +6,8 @@ const router = express.Router();
 
 router.get("/", resourcesController.getAllResources);
 
+router.get("/tags", resourcesController.getAllResourceTags);
+
 router.get("/:id", resourcesController.getResourceById);
 
 router.post("/", (req, res) => {
