@@ -16,4 +16,4 @@ router.post('/', createFoodItem);        // Create a new food item
 router.put('/:id', updateFoodItem);      // Update a food item
 router.delete('/:id', deleteFoodItem);   // Delete a food item
 
-export default router;
+export { router as foodRouter };
