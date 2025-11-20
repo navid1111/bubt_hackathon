@@ -14,6 +14,19 @@ export const getAllResources = async (req: Request, res: Response) => {
   }
 };
 
+export const getAllResourceTags = async (req: Request, res: Response) => {
+  try {
+    const tags = await resourcesService.getAllResourceTags();
+    res.json({ message: "Retrieved resource tags successfully", data: tags });
+  } catch (error) {
+    console.error('Error fetching resource tags:', error);
+    res.status(500).json({
+      message: 'Error fetching resource tags',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
 export const getResourceById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -33,5 +46,6 @@ export const getResourceById = async (req: Request, res: Response) => {
 
 export const resourcesController = {
     getAllResources,
+    getAllResourceTags,
     getResourceById,
 };
