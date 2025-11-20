@@ -44,8 +44,12 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^4.13.23",
     "@prisma/adapter-pg": "^6.15.0",
     "@prisma/client": "^6.15.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "pg": "^8.16.3",
