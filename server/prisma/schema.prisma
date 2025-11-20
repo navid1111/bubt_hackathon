@@ -42,6 +42,7 @@ model FoodItem {
   id                    String           @id @default(uuid())
   name                  String
   unit                  String?
+  category              String?
   typicalExpirationDays Int?
   sampleCostPerUnit     Float?
   description           String?

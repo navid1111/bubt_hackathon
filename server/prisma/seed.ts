@@ -5,12 +5,14 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  // Create sample FoodItem entries
+  // Create sample FoodItem entries with categories
   const foodItems = await prisma.foodItem.createMany({
     data: [
+      // Fruits
       {
         name: 'Apple',
         unit: 'pcs',
+        category: 'fruit',
         typicalExpirationDays: 7,
         sampleCostPerUnit: 0.5,
         description: 'Fresh red apples'
@@ -18,24 +20,164 @@ async function main() {
       {
         name: 'Banana',
         unit: 'pcs',
+        category: 'fruit',
         typicalExpirationDays: 5,
         sampleCostPerUnit: 0.3,
         description: 'Ripe yellow bananas'
       },
+      {
+        name: 'Orange',
+        unit: 'pcs',
+        category: 'fruit',
+        typicalExpirationDays: 14,
+        sampleCostPerUnit: 0.6,
+        description: 'Fresh oranges'
+      },
+      {
+        name: 'Grapes',
+        unit: 'kg',
+        category: 'fruit',
+        typicalExpirationDays: 5,
+        sampleCostPerUnit: 3.0,
+        description: 'Green seedless grapes'
+      },
+      {
+        name: 'Strawberries',
+        unit: 'kg',
+        category: 'fruit',
+        typicalExpirationDays: 3,
+        sampleCostPerUnit: 4.5,
+        description: 'Fresh strawberries'
+      },
 
+      // Vegetables
+      {
+        name: 'Carrots',
+        unit: 'kg',
+        category: 'vegetable',
+        typicalExpirationDays: 21,
+        sampleCostPerUnit: 1.2,
+        description: 'Fresh carrots'
+      },
+      {
+        name: 'Lettuce',
+        unit: 'pcs',
+        category: 'vegetable',
+        typicalExpirationDays: 7,
+        sampleCostPerUnit: 1.5,
+        description: 'Fresh lettuce'
+      },
+      {
+        name: 'Tomato',
+        unit: 'kg',
+        category: 'vegetable',
+        typicalExpirationDays: 5,
+        sampleCostPerUnit: 2.0,
+        description: 'Fresh tomatoes'
+      },
+      {
+        name: 'Potato',
+        unit: 'kg',
+        category: 'vegetable',
+        typicalExpirationDays: 30,
+        sampleCostPerUnit: 0.8,
+        description: 'White potatoes'
+      },
+      {
+        name: 'Onion',
+        unit: 'kg',
+        category: 'vegetable',
+        typicalExpirationDays: 60,
+        sampleCostPerUnit: 0.6,
+        description: 'Yellow onions'
+      },
+
+      // Dairy
       {
         name: 'Milk',
         unit: 'litre',
+        category: 'dairy',
         typicalExpirationDays: 7,
         sampleCostPerUnit: 1.2,
         description: 'Whole milk, 1L'
       },
       {
+        name: 'Cheese',
+        unit: 'kg',
+        category: 'dairy',
+        typicalExpirationDays: 21,
+        sampleCostPerUnit: 8.0,
+        description: 'Cheddar cheese'
+      },
+      {
+        name: 'Eggs',
+        unit: 'dozen',
+        category: 'dairy',
+        typicalExpirationDays: 28,
+        sampleCostPerUnit: 2.5,
+        description: 'Large white eggs'
+      },
+
+      // Grains
+      {
         name: 'Bread',
         unit: 'pcs',
+        category: 'grain',
         typicalExpirationDays: 5,
         sampleCostPerUnit: 2.5,
         description: 'Whole wheat bread'
+      },
+      {
+        name: 'Rice',
+        unit: 'kg',
+        category: 'grain',
+        typicalExpirationDays: 365,
+        sampleCostPerUnit: 1.8,
+        description: 'Long grain white rice'
+      },
+      {
+        name: 'Pasta',
+        unit: 'kg',
+        category: 'grain',
+        typicalExpirationDays: 365,
+        sampleCostPerUnit: 1.2,
+        description: 'Spaghetti pasta'
+      },
+
+      // Proteins
+      {
+        name: 'Chicken Breast',
+        unit: 'kg',
+        category: 'protein',
+        typicalExpirationDays: 2,
+        sampleCostPerUnit: 8.0,
+        description: 'Fresh chicken breast'
+      },
+      {
+        name: 'Ground Beef',
+        unit: 'kg',
+        category: 'protein',
+        typicalExpirationDays: 2,
+        sampleCostPerUnit: 10.0,
+        description: 'Lean ground beef'
+      },
+
+      // Pantry
+      {
+        name: 'Olive Oil',
+        unit: 'litre',
+        category: 'pantry',
+        typicalExpirationDays: 365,
+        sampleCostPerUnit: 12.0,
+        description: 'Extra virgin olive oil'
+      },
+      {
+        name: 'Honey',
+        unit: 'kg',
+        category: 'pantry',
+        typicalExpirationDays: 730,
+        sampleCostPerUnit: 8.0,
+        description: 'Pure honey'
       }
     ],
     skipDuplicates: true,
