@@ -20,7 +20,7 @@ router.get('/health', (req: Request, res: Response) => {
 });
 
 // Public routes
-router.use('/foods', foodsRouter);
+router.use('/foods', foodRouter);
 router.use('/resources', resourcesRouter);
 
 // Protected routes (require authentication)
