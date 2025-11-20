@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 
 import { resourcesRouter } from './modules/resources/resources-router';
+import { usersRouter } from './modules/users/users-router';
 import { foodRouter } from './modules/foods/food-router';
 const router = express.Router();
 
@@ -14,11 +15,15 @@ router.get('/health', (req: Request, res: Response) => {
     status: 'OK',
     message: 'Food Waste Management API is running',
     timestamp: new Date().toISOString(),
+    clerkConfigured: !!process.env.CLERK_SECRET_KEY,
   });
 });
 
-router.use('/foods',foodRouter);
-
+// Public routes
+router.use('/foods', foodsRouter);
 router.use('/resources', resourcesRouter);
+
+// Protected routes (require authentication)
+router.use('/users', usersRouter);
 
 export default router;
