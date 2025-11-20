@@ -44,13 +44,11 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.0.0",
-    "@prisma/client": "^5.0.0",
-    "axios": "^1.13.2",
-    "compression": "^1.8.1",
-    "cors": "^2.8.5",
+    "@prisma/adapter-pg": "^6.15.0",
+    "@prisma/client": "^6.15.0",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "prisma": "^6.15.0"
   }
 }
