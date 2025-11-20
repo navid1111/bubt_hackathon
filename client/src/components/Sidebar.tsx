@@ -1,12 +1,11 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Leaf, 
-  LayoutDashboard, 
-  BookOpen, 
-  Package, 
-  BookMarked, 
-  Users, 
+import {
+  Leaf,
+  LayoutDashboard,
+  BookOpen,
+  Package,
+  BookMarked,
+  Users,
   User,
   LogOut,
   ChevronLeft,
@@ -15,29 +14,29 @@ import {
 import { UserButton, useClerk } from '@clerk/clerk-react';
 
 const navItems = [
-  { 
-    label: "Dashboard", 
-    to: "/dashboard", 
+  {
+    label: "Dashboard",
+    to: "/dashboard",
     icon: LayoutDashboard
   },
-  { 
-    label: "Daily Log", 
-    to: "/daily-log", 
+  {
+    label: "Daily Log",
+    to: "/daily-log",
     icon: BookOpen
   },
-  { 
-    label: "Inventory", 
-    to: "/inventory", 
+  {
+    label: "Inventory",
+    to: "/inventory",
     icon: Package
   },
-  { 
-    label: "Resources", 
-    to: "/resources", 
+  {
+    label: "Resources",
+    to: "/resources",
     icon: BookMarked
   },
-  { 
-    label: "Neighbourhood", 
-    to: "/neighbourhood", 
+  {
+    label: "Neighbourhood",
+    to: "/neighbourhood",
     icon: Users
   },
 ];
@@ -106,7 +105,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.to;
-              
+
               return (
                 <Link key={item.to} to={item.to} className="no-underline">
                   <button
