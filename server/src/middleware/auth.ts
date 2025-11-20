@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
 
 // Extend Express Request to include auth
@@ -16,8 +16,8 @@ declare global {
 // Create the middleware instance by calling the function
 const clerkAuth = ClerkExpressRequireAuth();
 
-// Export it as requireAuth
-export const requireAuth = clerkAuth;
+// Export it as requireAuth and assert the middleware type
+export const requireAuth: RequestHandler = clerkAuth as unknown as RequestHandler;
 
 // Optional: Custom middleware to ensure user exists in database
 export const ensureUserExists = async (
