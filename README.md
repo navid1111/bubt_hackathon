@@ -12,7 +12,7 @@ A comprehensive full-stack application designed to help users track, manage, and
 - **User Authentication**: Secure authentication powered by Clerk
 
 ### Key Capabilities
-- Real-time inventory tracking with expiration date monitoring
+- Inventory tracking with expiration date monitoring
 - Multi-inventory support for different storage locations
 - Consumption analytics and waste pattern identification
 - Comprehensive food database with nutritional information
