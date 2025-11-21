@@ -2,6 +2,7 @@ import { RedirectToSignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { Route, Routes } from 'react-router-dom';
 import AdminDashboard from './pages/AdminDashboard';
 import Home from './pages/Home';
+import IntelligentDashboard from './pages/IntelligentDashboard';
 import OnboardingPage from './pages/OnboardingPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
@@ -31,7 +32,6 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/sign-up" element={<SignUpPage />} />
-
           {/* Protected routes */}
           <Route
             path="/onboarding"
@@ -61,8 +61,8 @@ export default function App() {
             <Route path="neighbourhood" element={<NeighbourhoodPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="profile/edit" element={<EditProfilePage />} />
-          </Route>
-
+            <Route path="intelligence" element={<IntelligentDashboard />} />
+          </Route>{' '}
           {/* Admin Dashboard */}
           <Route
             path="/admin"
@@ -72,7 +72,6 @@ export default function App() {
               </SignedIn>
             }
           />
-
           {/* Redirect to sign in when signed out */}
           <Route
             path="*"
