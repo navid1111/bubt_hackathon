@@ -21,6 +21,8 @@ model User {
   inventoryItemsAdded InventoryItem[]   @relation("AddedInventoryItems")
   addedMembers        InventoryMember[] @relation("AddedInventoryMembers")
   inventoryMembers    InventoryMember[] @relation("UserInventoryMembers")
+  foodListings        FoodListing[]     @relation("UserListings")
+  sharingLogs         SharingLog[]      @relation("UserSharingLogs")
   profile             UserProfile?
   sdgAchievements     SdgAchievement[]
   sdgScores           SdgScore[]
@@ -113,6 +115,7 @@ model InventoryItem {
   deletedAt       DateTime?
   consumptionLogs ConsumptionLog[] @relation("InventoryItemConsumptions")
   files           File[]           @relation("InventoryItemFiles")
+  foodListing     FoodListing?     @relation("FoodListings")
   addedBy         User?            @relation("AddedInventoryItems", fields: [addedById], references: [id])
   foodItem        FoodItem?        @relation(fields: [foodItemId], references: [id])
   inventory       Inventory        @relation("InventoryItems", fields: [inventoryId], references: [id])
@@ -284,4 +287,48 @@ model SdgAchievement {
   title          String
   description    String
   unlockedAt     DateTime @default(now())
+}
+
+enum ListingStatus {
+  AVAILABLE
+  CLAIMED
+  COMPLETED
+  CANCELLED
+}
+
+model FoodListing {
+  id              String         @id @default(uuid())
+  inventoryItemId String         @unique
+  listerId        String
+  title           String
+  description     String?
+  quantity        Float
+  unit            String?
+  pickupLocation  String?
+  availableUntil  DateTime?
+  status          ListingStatus  @default(AVAILABLE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  isDeleted       Boolean        @default(false)
+  deletedAt       DateTime?
+  inventoryItem   InventoryItem  @relation("FoodListings", fields: [inventoryItemId], references: [id])
+  lister          User           @relation("UserListings", fields: [listerId], references: [id])
+  sharingLogs     SharingLog[]   @relation("ListingSharingLogs")
+}
+
+model SharingLog {
+  id            String      @id @default(uuid())
+  listingId     String
+  claimerId     String?
+  claimerName   String?
+  claimedAt     DateTime?
+  completedAt   DateTime?
+  notes         String?
+  quantityClaimed Float?
+  status        String      @default("CLAIMED") // CLAIMED, COMPLETED, CANCELLED
+  createdAt     DateTime    @default(now())
+  isDeleted     Boolean     @default(false)
+  deletedAt     DateTime?
+  listing       FoodListing @relation("ListingSharingLogs", fields: [listingId], references: [id])
+  claimer       User?       @relation("UserSharingLogs", fields: [claimerId], references: [id])
 }
