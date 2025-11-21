@@ -49,6 +49,14 @@ async function main() {
         sampleCostPerUnit: 4.5,
         description: 'Fresh strawberries'
       },
+      {
+        name: 'Mango',
+        unit: 'pcs',
+        category: 'fruit',
+        typicalExpirationDays: 7,
+        sampleCostPerUnit: 1.5,
+        description: 'Fresh mangoes'
+      },
 
       // Vegetables
       {

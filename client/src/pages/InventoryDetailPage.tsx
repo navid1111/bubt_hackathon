@@ -23,10 +23,23 @@ export interface InventoryItem {
   expiryDate?: string;
   notes?: string;
   foodItem?: {
+    id: string;
     name: string;
     category: string;
+    unit: string;
     typicalExpirationDays?: number;
+    description?: string;
   };
+}
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  unit?: string;
+  category?: string;
+  typicalExpirationDays?: number;
+  sampleCostPerUnit?: number;
+  description?: string;
 }
 
 export default function InventoryDetailPage() {
@@ -238,7 +251,7 @@ export default function InventoryDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map(item => {
               const itemName = item.customName || item.foodItem?.name || 'Unknown Item';
-              const itemCategory = item.foodItem?.category || 'uncategorized';
+              const itemCategory = item.foodItem?.category || (item.foodItemId ? 'uncategorized' : 'custom');
               
               return (
                 <div key={item.id} className="bg-card rounded-xl border border-border p-6 shadow hover:shadow-lg transition-smooth">
@@ -249,7 +262,20 @@ export default function InventoryDetailPage() {
                     {itemCategory === 'grain' && <Package className="w-6 h-6 text-primary" />}
                     {itemCategory === 'protein' && <Package className="w-6 h-6 text-primary" />}
                     {itemCategory === 'pantry' && <Package className="w-6 h-6 text-primary" />}
-                    <span className="font-bold text-lg text-foreground">{itemName}</span>
+                    {itemCategory === 'custom' && <AlertCircle className="w-6 h-6 text-orange-500" />}
+                    <div className="flex-1">
+                      <span className="font-bold text-lg text-foreground">{itemName}</span>
+                      {item.foodItem && (
+                        <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                          Linked
+                        </span>
+                      )}
+                      {!item.foodItem && item.customName && (
+                        <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                          Custom
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mb-3">
@@ -302,24 +328,72 @@ interface AddItemModalProps {
 
 function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
   const [form, setForm] = useState({
-    name: '',
-    category: '',
+    selectedFoodItemId: '',
+    customName: '',
     quantity: 0,
     unit: '',
     expirationDate: '',
     purchaseDate: '',
     location: '',
     notes: '',
+    useCustomItem: false,
   });
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loadingFoodItems, setLoadingFoodItems] = useState(true);
+
+  // Fetch food items from the API
+  useEffect(() => {
+    const fetchFoodItems = async () => {
+      try {
+        const response = await fetch('/api/foods');
+        if (response.ok) {
+          const data = await response.json();
+          setFoodItems(data.data || []);
+        } else {
+          console.error('Failed to fetch food items');
+        }
+      } catch (error) {
+        console.error('Error fetching food items:', error);
+      } finally {
+        setLoadingFoodItems(false);
+      }
+    };
+
+    fetchFoodItems();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm({
-      ...form,
-      [name]: name === 'quantity' ? Number(value) : value
-    });
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+    } else {
+      setForm(prev => ({
+        ...prev,
+        [name]: name === 'quantity' ? Number(value) : value
+      }));
+    }
+
+    // Auto-fill unit when food item is selected
+    if (name === 'selectedFoodItemId' && value) {
+      const selectedFood = foodItems.find(item => item.id === value);
+      if (selectedFood) {
+        setForm(prev => ({
+          ...prev,
+          unit: selectedFood.unit || '',
+          // Auto-calculate expiry date if typical expiration days is available
+          expirationDate: selectedFood.typicalExpirationDays 
+            ? new Date(Date.now() + selectedFood.typicalExpirationDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            : prev.expirationDate
+        }));
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -328,9 +402,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
     setError('');
 
     try {
-      // Map client form fields to server API fields
       const itemData = {
-        customName: form.name,
+        foodItemId: form.useCustomItem ? undefined : form.selectedFoodItemId || undefined,
+        customName: form.useCustomItem ? form.customName : undefined,
         quantity: form.quantity,
         unit: form.unit,
         expiryDate: form.expirationDate ? new Date(form.expirationDate) : undefined,
@@ -362,14 +436,57 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
         )}
 
         <div className="flex flex-col gap-3">
-          <input
-            name="name"
-            required
-            placeholder="Item name"
-            value={form.name}
-            onChange={handleChange}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-          />
+          {/* Toggle between existing food items and custom items */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useCustomItem"
+              name="useCustomItem"
+              checked={form.useCustomItem}
+              onChange={handleChange}
+              className="rounded"
+            />
+            <label htmlFor="useCustomItem" className="text-sm text-foreground">
+              Add custom item (not in database)
+            </label>
+          </div>
+
+          {!form.useCustomItem ? (
+            // Select from existing food items
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Select Food Item
+              </label>
+              {loadingFoodItems ? (
+                <div className="text-sm text-foreground/60">Loading food items...</div>
+              ) : (
+                <select
+                  name="selectedFoodItemId"
+                  value={form.selectedFoodItemId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  required={!form.useCustomItem}
+                >
+                  <option value="">Select a food item...</option>
+                  {foodItems.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({item.category}) - {item.unit}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : (
+            // Custom item name
+            <input
+              name="customName"
+              required={form.useCustomItem}
+              placeholder="Custom item name"
+              value={form.customName}
+              onChange={handleChange}
+              className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <input
@@ -393,37 +510,31 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
             />
           </div>
 
-          <select
-            name="category"
-            value={form.category}
-            onChange={handleChange}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-            required
-          >
-            <option value="">Select Category</option>
-            <option value="fruit">Fruit</option>
-            <option value="vegetable">Vegetable</option>
-            <option value="dairy">Dairy</option>
-            <option value="grain">Grain</option>
-            <option value="protein">Protein</option>
-            <option value="pantry">Pantry</option>
-          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-foreground/70 mb-1">Expiration Date</label>
+              <input
+                name="expirationDate"
+                type="date"
+                value={form.expirationDate || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              />
+            </div>
 
-          <input
-            name="expirationDate"
-            type="date"
-            value={form.expirationDate || ''}
-            onChange={handleChange}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-          />
+            <div>
+              <label className="block text-xs text-foreground/70 mb-1">Purchase Date</label>
+              <input
+                name="purchaseDate"
+                type="date"
+                value={form.purchaseDate || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              />
+            </div>
+          </div>
 
-          <input
-            name="purchaseDate"
-            type="date"
-            value={form.purchaseDate || ''}
-            onChange={handleChange}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-          />
+
 
           <input
             name="location"

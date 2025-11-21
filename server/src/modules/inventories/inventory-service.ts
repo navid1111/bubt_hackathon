@@ -77,6 +77,16 @@ export class InventoryService {
             addedAt: true,
             expiryDate: true,
             notes: true,
+            foodItem: {
+              select: {
+                id: true,
+                name: true,
+                category: true,
+                unit: true,
+                typicalExpirationDays: true,
+                description: true,
+              },
+            },
           },
           orderBy: {
             addedAt: 'desc',
@@ -187,8 +197,13 @@ export class InventoryService {
       throw new Error('Inventory not found or does not belong to user');
     }
 
-    // If a foodItemId is provided, verify it exists
+    // Handle food item lookup logic
+    let finalFoodItemId = data.foodItemId;
+    let finalCustomName = data.customName;
+    let finalUnit = data.unit;
+
     if (data.foodItemId) {
+      // If a foodItemId is provided, verify it exists
       const foodItem = await prisma.foodItem.findFirst({
         where: {
           id: data.foodItemId,
@@ -199,18 +214,49 @@ export class InventoryService {
       if (!foodItem) {
         throw new Error('Food item not found');
       }
+    } else if (data.customName) {
+      // If no foodItemId but customName provided, try to find matching food item
+      const matchingFoodItem = await prisma.foodItem.findFirst({
+        where: {
+          name: {
+            equals: data.customName.trim(),
+            mode: 'insensitive',
+          },
+          isDeleted: false,
+        },
+      });
+
+      if (matchingFoodItem) {
+        // Found matching food item, use it instead of creating custom item
+        finalFoodItemId = matchingFoodItem.id;
+        finalCustomName = matchingFoodItem.name; // Use the exact name from DB
+        finalUnit = data.unit || matchingFoodItem.unit || undefined; // Prefer provided unit, fallback to food item unit
+      }
+      // If no matching food item found, keep as custom item (finalFoodItemId remains null)
     }
 
     return await prisma.inventoryItem.create({
       data: {
         inventoryId,
-        foodItemId: data.foodItemId,
-        customName: data.customName,
+        foodItemId: finalFoodItemId,
+        customName: finalCustomName,
         quantity: data.quantity,
-        unit: data.unit,
+        unit: finalUnit,
         expiryDate: data.expiryDate,
         notes: data.notes,
         addedById: user.id,
+      },
+      include: {
+        foodItem: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            unit: true,
+            typicalExpirationDays: true,
+            description: true,
+          },
+        },
       },
     });
   }
