@@ -369,7 +369,16 @@ export function useInventory() {
     endDate?: Date;
     inventoryId?: string;
   }) => {
-    const queryKey = ['consumption-logs', filters];
+    // Create stable query key by serializing dates to ISO strings
+    const queryKey = [
+      'consumption-logs',
+      {
+        startDate: filters?.startDate?.toISOString() || null,
+        endDate: filters?.endDate?.toISOString() || null,
+        inventoryId: filters?.inventoryId || null,
+      }
+    ];
+    
     return useQuery<ConsumptionLog[]>({
       queryKey,
       queryFn: async () => {
@@ -405,10 +414,12 @@ export function useInventory() {
           return response.consumptionLogs || [];
         } catch (error) {
           console.error('Error fetching consumption logs:', error);
-          console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-          });
+          if (error instanceof Error) {
+            console.error('Error details:', {
+              message: error.message,
+              stack: error.stack,
+            });
+          }
           // Return empty array on error to prevent UI crashes
           return [];
         }

@@ -50,28 +50,41 @@ export default function Dashboard() {
   const { profile, loading: profileLoading } = useProfile();
   const { useGetInventories, useGetConsumptionLogs } = useInventory();
   
-  // Date range for analytics (last 30 days)
+  // Date range for analytics (last 30 days) - Stable across renders
   const dateRange = useMemo(() => {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
+    // Normalize to start/end of day for consistent caching
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
     return { startDate, endDate };
-  }, []);
+  }, []); // Empty dependency array for stable dates
 
   // Fetch user data
   const { data: inventories = [], isLoading: inventoriesLoading } = useGetInventories();
-  const { data: consumptionLogs = [], isLoading: consumptionLoading } = useGetConsumptionLogs({
+  
+  // Memoize consumption query params to prevent refetches
+  const consumptionParams = useMemo(() => ({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
-  });
+  }), [dateRange.startDate, dateRange.endDate]);
+  
+  const { data: consumptionLogs = [], isLoading: consumptionLoading } = useGetConsumptionLogs(consumptionParams);
   const { data: resources = [], isLoading: resourcesLoading } = useQuery({
     queryKey: ['resources'],
     queryFn: getAllResources,
   });
 
-  // Fetch analytics data
+  // Fetch analytics data with stable query key
   const { data: consumptionPatterns, isLoading: patternsLoading } = useQuery({
-    queryKey: ['consumption-patterns', dateRange],
+    queryKey: [
+      'consumption-patterns', 
+      {
+        startDate: dateRange.startDate.toISOString(),
+        endDate: dateRange.endDate.toISOString(),
+      }
+    ],
     queryFn: async (): Promise<ConsumptionPattern> => {
       const params = new URLSearchParams({
         startDate: dateRange.startDate.toISOString(),
@@ -90,10 +103,14 @@ export default function Dashboard() {
   });
 
   // Get all inventory items for comprehensive stats
-  // We need to fetch all inventory items, but we can't use hooks in a loop
-  // So we'll create a single query that fetches all items for all inventories
+  // Memoize inventory IDs to prevent unnecessary refetches
+  const inventoryIds = useMemo(() => 
+    inventories.map(inv => inv.id).sort(), // Sort for consistent ordering
+    [inventories]
+  );
+  
   const { data: allInventoryItems = [], isLoading: itemsLoading } = useQuery({
-    queryKey: ['all-inventory-items', inventories.map(inv => inv.id)],
+    queryKey: ['all-inventory-items', inventoryIds],
     queryFn: async () => {
       if (!inventories.length) return [];
       

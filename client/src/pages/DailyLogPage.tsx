@@ -13,10 +13,18 @@ import { useMemo, useState } from 'react';
 import { useInventory, type ConsumptionLog } from '../hooks/useInventory';
 
 export default function DailyLogPage() {
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().setDate(new Date().getDate() - 7)), // Last 7 days
-    endDate: new Date(),
-  });
+  // Stable default date range using useMemo to prevent cache misses
+  const defaultDateRange = useMemo(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7); // Last 7 days
+    // Normalize to start/end of day for consistent caching
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    return { startDate, endDate };
+  }, []);
+
+  const [dateRange, setDateRange] = useState(defaultDateRange);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     inventoryId: '',
@@ -24,17 +32,25 @@ export default function DailyLogPage() {
   });
 
   const { useGetConsumptionLogs, useGetInventories } = useInventory();
-  const { data: inventories, isLoading: inventoriesLoading } =
+  const { data: inventories, isLoading: inventoriesLoading, isError: inventoriesError } =
     useGetInventories();
-  const {
-    data: consumptionLogs,
-    isLoading,
-    error,
-  } = useGetConsumptionLogs({
+    
+  // Memoize the consumption logs query parameters to prevent unnecessary refetches
+  const consumptionParams = useMemo(() => ({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
     inventoryId: filters.inventoryId || undefined,
-  });
+  }), [dateRange.startDate, dateRange.endDate, filters.inventoryId]);
+
+  const {
+    data: consumptionLogs,
+    isLoading: consumptionLoading,
+    error: consumptionError,
+  } = useGetConsumptionLogs(consumptionParams);
+
+  // Combine loading states
+  const isLoading = consumptionLoading;
+  const error = consumptionError || (inventoriesError ? 'Failed to load inventories' : null);
 
   // Filter logs based on selected filters
   const filteredLogs = useMemo(() => {
@@ -115,6 +131,29 @@ export default function DailyLogPage() {
 
   const hasActiveFilters = filters.inventoryId || filters.category;
 
+  // Optimized date change handlers to prevent unnecessary cache invalidation
+  const handleStartDateChange = useMemo(() => 
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newDate = new Date(e.target.value);
+      newDate.setHours(0, 0, 0, 0); // Start of day
+      setDateRange(prev => ({
+        ...prev,
+        startDate: newDate,
+      }));
+    }, []
+  );
+
+  const handleEndDateChange = useMemo(() => 
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newDate = new Date(e.target.value);
+      newDate.setHours(23, 59, 59, 999); // End of day
+      setDateRange(prev => ({
+        ...prev,
+        endDate: newDate,
+      }));
+    }, []
+  );
+
   // Get unique categories from logs
   const availableCategories = Array.from(
     new Set(
@@ -168,24 +207,14 @@ export default function DailyLogPage() {
             <input
               type="date"
               value={dateRange.startDate.toISOString().split('T')[0]}
-              onChange={e =>
-                setDateRange(prev => ({
-                  ...prev,
-                  startDate: new Date(e.target.value),
-                }))
-              }
+              onChange={handleStartDateChange}
               className="px-3 py-1 border border-border rounded-lg bg-background text-foreground text-sm"
             />
             <span className="text-foreground/50">to</span>
             <input
               type="date"
               value={dateRange.endDate.toISOString().split('T')[0]}
-              onChange={e =>
-                setDateRange(prev => ({
-                  ...prev,
-                  endDate: new Date(e.target.value),
-                }))
-              }
+              onChange={handleEndDateChange}
               className="px-3 py-1 border border-border rounded-lg bg-background text-foreground text-sm"
             />
           </div>
@@ -201,9 +230,14 @@ export default function DailyLogPage() {
             </div>
             <div>
               <p className="text-sm text-foreground/70">Items Consumed Today</p>
-              <p className="text-2xl font-bold text-foreground">
-                {dailyStats.totalItems}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-foreground">
+                  {dailyStats.totalItems}
+                </p>
+                {isLoading && (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin opacity-70" />
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -215,9 +249,14 @@ export default function DailyLogPage() {
             </div>
             <div>
               <p className="text-sm text-foreground/70">Total Quantity</p>
-              <p className="text-2xl font-bold text-foreground">
-                {dailyStats.totalQuantity.toFixed(1)}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-foreground">
+                  {dailyStats.totalQuantity.toFixed(1)}
+                </p>
+                {isLoading && (
+                  <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin opacity-70" />
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -229,9 +268,14 @@ export default function DailyLogPage() {
             </div>
             <div>
               <p className="text-sm text-foreground/70">Food Categories</p>
-              <p className="text-2xl font-bold text-foreground">
-                {dailyStats.uniqueCategories}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-foreground">
+                  {dailyStats.uniqueCategories}
+                </p>
+                {isLoading && (
+                  <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin opacity-70" />
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -372,9 +416,12 @@ export default function DailyLogPage() {
           <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
             <Clock className="w-5 h-5" />
             Consumption Timeline
+            {isLoading && (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin opacity-70" />
+            )}
           </h2>
           <p className="text-foreground/70 text-sm mt-1">
-            {filteredLogs.length} consumption entries found
+            {isLoading ? 'Loading...' : `${filteredLogs.length} consumption entries found`}
           </p>
         </div>
 
@@ -391,8 +438,7 @@ export default function DailyLogPage() {
                 Unable to load consumption logs
               </h3>
               <p className="text-foreground/60 mb-4">
-                There was an error loading your consumption data. Please try
-                again.
+                {typeof error === 'string' ? error : 'There was an error loading your consumption data. Please try again.'}
               </p>
               <button
                 onClick={() => window.location.reload()}
