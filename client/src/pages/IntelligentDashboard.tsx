@@ -4,7 +4,6 @@ import {
   BarChart3,
   Brain,
   Calendar,
-  Clock,
   DollarSign,
   Leaf,
   Lightbulb,
@@ -12,18 +11,61 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import MarkdownRenderer from '../components/MarkdownRenderer';
+import AIResponseDisplay from '../components/AIResponseDisplay';
 
 interface DashboardInsight {
-  consumption?: any;
-  impact?: any;
-  waste?: any;
+  consumption?: {
+    patterns?: {
+      totalItems?: number;
+      categoryBreakdown?: Record<string, number>;
+      timePatterns?: Record<string, number>;
+      consistencyScore?: number;
+      favoriteCategories?: string[];
+    };
+    aiInsights?: string;
+  };
+  impact?: {
+    impact?: {
+      environmental?: {
+        co2Saved?: number;
+        waterSaved?: number;
+        wastePrevented?: number;
+      };
+      financial?: {
+        moneySaved?: number;
+        avgSavingsPerDay?: number;
+      };
+      achievements?: string[];
+      recommendations?: string[];
+    };
+  };
+  waste?: {
+    wasteRiskItems?: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      expiryDate: Date | null;
+      daysUntilExpiry: number;
+      wasteRisk: 'High' | 'Medium' | 'Low';
+      estimatedValue: number;
+      suggestions: string[];
+    }>;
+    totalPotentialWasteValue?: number;
+    estimatedCO2Impact?: number;
+    summary?: {
+      highRisk?: number;
+      mediumRisk?: number;
+      totalAtRisk?: number;
+    };
+  };
 }
 
 interface AIResponse {
   success: boolean;
   response?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   insights?: string;
   toolsUsed?: number;
 }
@@ -36,14 +78,16 @@ const IntelligentDashboard: React.FC = () => {
   const [chatQuery, setChatQuery] = useState('');
   const [chatResponse, setChatResponse] = useState<AIResponse | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [quickActionResponse, setQuickActionResponse] =
+    useState<AIResponse | null>(null);
+  const [nutritionInsights, setNutritionInsights] = useState<AIResponse | null>(
+    null,
+  );
+  const [loadingInsight, setLoadingInsight] = useState<string | null>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-  useEffect(() => {
-    fetchDashboardInsights();
-  }, []);
-
-  const fetchDashboardInsights = async () => {
+  const fetchDashboardInsights = useCallback(async () => {
     try {
       const token = await getToken();
       const response = await fetch(`${API_URL}/intelligence/dashboard`, {
@@ -61,7 +105,11 @@ const IntelligentDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken, API_URL]);
+
+  useEffect(() => {
+    fetchDashboardInsights();
+  }, [fetchDashboardInsights]);
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,8 +145,9 @@ const IntelligentDashboard: React.FC = () => {
 
   const fetchSpecificInsight = async (
     endpoint: string,
-    setter?: (data: any) => void,
+    setter?: (data: Record<string, unknown>) => void,
   ) => {
+    setLoadingInsight(endpoint);
     try {
       const token = await getToken();
       const response = await fetch(`${API_URL}/intelligence/${endpoint}`, {
@@ -109,11 +158,58 @@ const IntelligentDashboard: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
+
+        // Create an AI response object for display
+        const aiResponse: AIResponse = {
+          success: true,
+          response:
+            data.data.response ||
+            data.data.insights ||
+            data.message ||
+            'Analysis completed successfully.',
+          toolsUsed: data.data.toolsUsed || 1,
+          data: data.data,
+        };
+
+        // Handle specific endpoints
+        if (endpoint === 'nutrition-analysis') {
+          setNutritionInsights(aiResponse);
+        } else {
+          setQuickActionResponse(aiResponse);
+        }
+
+        // Update insights state for data display
+        if (endpoint === 'consumption-analysis') {
+          setInsights(prev => ({ ...prev, consumption: data.data }));
+        } else if (endpoint === 'waste-prediction') {
+          setInsights(prev => ({ ...prev, waste: data.data }));
+        } else if (endpoint === 'impact-analytics') {
+          setInsights(prev => ({ ...prev, impact: data.data }));
+        }
+
         if (setter) setter(data.data);
         return data.data;
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analysis failed');
       }
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
+      const errorResponse: AIResponse = {
+        success: false,
+        response: `Sorry, I encountered an error while fetching ${endpoint.replace(
+          '-',
+          ' ',
+        )}. Please try again.`,
+      };
+
+      if (endpoint === 'nutrition-analysis') {
+        setNutritionInsights(errorResponse);
+      } else {
+        setQuickActionResponse(errorResponse);
+      }
+    } finally {
+      setLoadingInsight(null);
     }
   };
 
@@ -171,7 +267,12 @@ const IntelligentDashboard: React.FC = () => {
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    // Clear responses when switching tabs for cleaner experience
+                    if (tab.id !== 'overview') setQuickActionResponse(null);
+                    if (tab.id !== 'nutrition') setNutritionInsights(null);
+                  }}
                   className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm ${
                     activeTab === tab.id
                       ? 'border-purple-500 text-purple-600'
@@ -291,10 +392,25 @@ const IntelligentDashboard: React.FC = () => {
                     <button
                       key={index}
                       onClick={action.action}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
+                      disabled={loadingInsight !== null}
+                      className="p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <action.icon className="w-5 h-5 text-purple-600" />
+                        {loadingInsight &&
+                        ((action.title === 'Consumption Analysis' &&
+                          loadingInsight === 'consumption-analysis') ||
+                          (action.title === 'Waste Prediction' &&
+                            loadingInsight === 'waste-prediction') ||
+                          (action.title === 'Nutrition Analysis' &&
+                            loadingInsight === 'nutrition-analysis') ||
+                          (action.title === 'Impact Analytics' &&
+                            loadingInsight === 'impact-analytics') ||
+                          (action.title === 'Get Recommendations' &&
+                            loadingInsight === 'recommendations')) ? (
+                          <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <action.icon className="w-5 h-5 text-purple-600" />
+                        )}
                         <h3 className="font-medium text-gray-900">
                           {action.title}
                         </h3>
@@ -305,6 +421,27 @@ const IntelligentDashboard: React.FC = () => {
                     </button>
                   ))}
                 </div>
+
+                {/* Display Quick Action Response */}
+                {quickActionResponse && (
+                  <div className="mt-6">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-medium text-gray-900">
+                        Analysis Results
+                      </h3>
+                      <button
+                        onClick={() => setQuickActionResponse(null)}
+                        className="text-sm text-gray-500 hover:text-gray-700 underline"
+                      >
+                        Clear Results
+                      </button>
+                    </div>
+                    <AIResponseDisplay
+                      response={quickActionResponse}
+                      className=""
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -356,30 +493,7 @@ const IntelligentDashboard: React.FC = () => {
                 </form>
 
                 {chatResponse && (
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Brain className="w-4 h-4 text-purple-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-medium text-gray-900">
-                            AI Assistant
-                          </h4>
-                          {chatResponse.toolsUsed && (
-                            <span className="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">
-                              Used {chatResponse.toolsUsed} analysis tools
-                            </span>
-                          )}
-                        </div>
-                        <div className="prose prose-sm max-w-none">
-                          <p className="text-gray-700 whitespace-pre-wrap">
-                            {chatResponse.response}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <AIResponseDisplay response={chatResponse} className="mt-6" />
                 )}
 
                 {/* Example Questions */}
@@ -411,37 +525,329 @@ const IntelligentDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Other tabs would be implemented similarly with specific content */}
-        {activeTab !== 'overview' && activeTab !== 'chat' && (
+        {/* Consumption Tab */}
+        {activeTab === 'consumption' && (
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-center py-12">
-              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}{' '}
-                Analysis
-              </h3>
-              <p className="text-gray-600 mb-4">
-                This section will show detailed {activeTab} insights and
-                analytics.
-              </p>
-              <button
-                onClick={() =>
-                  fetchSpecificInsight(
-                    activeTab === 'consumption'
-                      ? 'consumption-analysis'
-                      : activeTab === 'waste'
-                      ? 'waste-prediction'
-                      : activeTab === 'nutrition'
-                      ? 'nutrition-analysis'
-                      : 'impact-analytics',
-                  )
-                }
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                Generate{' '}
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Report
-              </button>
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Consumption Analysis
+            </h2>
+            {insights.consumption?.aiInsights && (
+              <div className="mb-6">
+                <h3 className="font-medium text-gray-900 mb-3">AI Insights</h3>
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <MarkdownRenderer
+                    content={insights.consumption.aiInsights}
+                    className="space-y-3 text-gray-700"
+                  />
+                </div>
+              </div>
+            )}
+            {insights.consumption?.patterns && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Category Breakdown
+                  </h4>
+                  {Object.entries(
+                    insights.consumption.patterns.categoryBreakdown || {},
+                  ).map(([category, count]) => (
+                    <div
+                      key={category}
+                      className="flex justify-between items-center py-1"
+                    >
+                      <span className="text-gray-600">{category}</span>
+                      <span className="font-medium text-gray-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Time Patterns
+                  </h4>
+                  {Object.entries(
+                    insights.consumption.patterns.timePatterns || {},
+                  ).map(([time, count]) => (
+                    <div
+                      key={time}
+                      className="flex justify-between items-center py-1"
+                    >
+                      <span className="text-gray-600">{time}</span>
+                      <span className="font-medium text-gray-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!insights.consumption && (
+              <div className="text-center py-12">
+                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
+                  No consumption analysis available yet.
+                </p>
+                <button
+                  onClick={() => fetchSpecificInsight('consumption-analysis')}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Generate Consumption Report
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Waste Prevention Tab */}
+        {activeTab === 'waste' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Waste Prevention
+            </h2>
+            {insights.waste?.wasteRiskItems && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-red-900">High Risk</h4>
+                    <div className="text-2xl font-bold text-red-600">
+                      {insights.waste.summary?.highRisk || 0}
+                    </div>
+                    <p className="text-sm text-red-600">Items expiring soon</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-orange-900">Medium Risk</h4>
+                    <div className="text-2xl font-bold text-orange-600">
+                      {insights.waste.summary?.mediumRisk || 0}
+                    </div>
+                    <p className="text-sm text-orange-600">Items to monitor</p>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-900">
+                      Potential Savings
+                    </h4>
+                    <div className="text-2xl font-bold text-green-600">
+                      ${insights.waste.totalPotentialWasteValue || 0}
+                    </div>
+                    <p className="text-sm text-green-600">If waste prevented</p>
+                  </div>
+                </div>
+                {insights.waste.wasteRiskItems.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">
+                      Items at Risk
+                    </h4>
+                    <div className="space-y-2">
+                      {insights.waste.wasteRiskItems
+                        .slice(0, 5)
+                        .map((item, index: number) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div>
+                              <span className="font-medium text-gray-900">
+                                {item.name}
+                              </span>
+                              <div className="text-sm text-gray-600">
+                                {item.daysUntilExpiry} days until expiry •{' '}
+                                {item.quantity} items
+                              </div>
+                            </div>
+                            <div
+                              className={`px-2 py-1 rounded text-xs font-medium ${
+                                item.wasteRisk === 'High'
+                                  ? 'bg-red-100 text-red-800'
+                                  : item.wasteRisk === 'Medium'
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}
+                            >
+                              {item.wasteRisk} Risk
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {!insights.waste && (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
+                  No waste analysis available yet.
+                </p>
+                <button
+                  onClick={() => fetchSpecificInsight('waste-prediction')}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Generate Waste Prediction
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Impact Tab */}
+        {activeTab === 'impact' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Environmental & Financial Impact
+            </h2>
+            {insights.impact?.impact && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-900">CO₂ Saved</h4>
+                    <div className="text-2xl font-bold text-green-600">
+                      {insights.impact.impact.environmental?.co2Saved || 0}kg
+                    </div>
+                    <p className="text-sm text-green-600">
+                      Carbon footprint reduced
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900">Water Saved</h4>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {insights.impact.impact.environmental?.waterSaved || 0}L
+                    </div>
+                    <p className="text-sm text-blue-600">Water conservation</p>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-purple-900">Money Saved</h4>
+                    <div className="text-2xl font-bold text-purple-600">
+                      ${insights.impact.impact.financial?.moneySaved || 0}
+                    </div>
+                    <p className="text-sm text-purple-600">Financial benefit</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-orange-900">
+                      Waste Prevented
+                    </h4>
+                    <div className="text-2xl font-bold text-orange-600">
+                      {insights.impact.impact.environmental?.wastePrevented ||
+                        0}
+                      kg
+                    </div>
+                    <p className="text-sm text-orange-600">
+                      Food waste avoided
+                    </p>
+                  </div>
+                </div>
+                {insights.impact.impact.achievements?.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">
+                      Achievements
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {insights.impact.impact.achievements.map(
+                        (achievement: string, index: number) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium"
+                          >
+                            🏆 {achievement}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+                {insights.impact.impact.recommendations?.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">
+                      Recommendations
+                    </h4>
+                    <div className="space-y-2">
+                      {insights.impact.impact.recommendations.map(
+                        (rec: string, index: number) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg"
+                          >
+                            <Lightbulb className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
+                            <span className="text-gray-700">{rec}</span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {!insights.impact && (
+              <div className="text-center py-12">
+                <Leaf className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
+                  No impact analysis available yet.
+                </p>
+                <button
+                  onClick={() => fetchSpecificInsight('impact-analytics')}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Generate Impact Report
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Nutrition Tab */}
+        {activeTab === 'nutrition' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Nutrition Analysis
+            </h2>
+
+            {/* Display AI Insights if available */}
+            {nutritionInsights && (
+              <div className="mb-6">
+                <h3 className="font-medium text-gray-900 mb-3">
+                  AI Nutrition Analysis
+                </h3>
+                <AIResponseDisplay response={nutritionInsights} className="" />
+              </div>
+            )}
+
+            {/* Generate button or loading state */}
+            {!nutritionInsights && (
+              <div className="text-center py-12">
+                <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Nutrition Analysis
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Get detailed nutrition insights and recommendations based on
+                  your consumption patterns.
+                </p>
+                <button
+                  onClick={() => fetchSpecificInsight('nutrition-analysis')}
+                  disabled={loadingInsight === 'nutrition-analysis'}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                >
+                  {loadingInsight === 'nutrition-analysis' ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Analyzing Nutrition...
+                    </>
+                  ) : (
+                    <>
+                      <Target className="w-4 h-4" />
+                      Generate Nutrition Report
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Clear Analysis Button */}
+            {nutritionInsights && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setNutritionInsights(null)}
+                  className="text-sm text-gray-500 hover:text-gray-700 underline"
+                >
+                  Clear Analysis
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
