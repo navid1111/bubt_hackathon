@@ -1,6 +1,5 @@
 import prisma from '../../config/database';
 import {
-  ConsumptionLogFilters,
   ConsumptionLogRequest,
   InventoryItemFilters,
   InventoryItemRequest,
@@ -418,7 +417,7 @@ export class InventoryService {
     if (!user) {
       throw new Error('User not found in database');
     }
-    
+
     // Verify that the inventory belongs to the user
     const inventory = await prisma.inventory.findFirst({
       where: {
@@ -467,7 +466,9 @@ export class InventoryService {
     // Create the consumption log
     const consumptionLogData = {
       inventoryId: data.inventoryId,
-      inventoryItemId: data.inventoryItemId?.startsWith('temp-') ? null : data.inventoryItemId,
+      inventoryItemId: data.inventoryItemId?.startsWith('temp-')
+        ? null
+        : data.inventoryItemId,
       foodItemId: data.foodItemId,
       itemName: data.itemName,
       quantity: data.quantity,
@@ -475,7 +476,7 @@ export class InventoryService {
       consumedAt: data.consumedAt || new Date(),
       notes: data.notes,
     };
-    
+
     const consumptionLog = await prisma.consumptionLog.create({
       data: consumptionLogData,
     });
@@ -526,7 +527,9 @@ export class InventoryService {
       inventoryId?: string;
     } = {},
   ) {
-    console.log('🔍 [getConsumptionLogs] === STARTING CONSUMPTION LOGS FETCH ===');
+    console.log(
+      '🔍 [getConsumptionLogs] === STARTING CONSUMPTION LOGS FETCH ===',
+    );
     console.log('🔍 [getConsumptionLogs] User Clerk ID:', userId);
     console.log('🔍 [getConsumptionLogs] Filters received:', {
       startDate: filters?.startDate?.toISOString?.() || filters?.startDate,
@@ -541,24 +544,33 @@ export class InventoryService {
         where: { clerkId: userId },
       });
 
-      console.log('🔍 [getConsumptionLogs] Database user found:', user ? { id: user.id, clerkId: user.clerkId } : 'NULL');
+      console.log(
+        '🔍 [getConsumptionLogs] Database user found:',
+        user ? { id: user.id, clerkId: user.clerkId } : 'NULL',
+      );
 
       if (!user) {
-        console.error('❌ [getConsumptionLogs] User not found in database for Clerk ID:', userId);
+        console.error(
+          '❌ [getConsumptionLogs] User not found in database for Clerk ID:',
+          userId,
+        );
         throw new Error('User not found in database');
       }
 
       // Check user's inventories
       console.log('🔍 [getConsumptionLogs] Fetching user inventories...');
       const userInventories = await prisma.inventory.findMany({
-        where: { 
+        where: {
           createdById: user.id,
-          isDeleted: false 
+          isDeleted: false,
         },
         select: { id: true, name: true },
       });
-      
-      console.log('🔍 [getConsumptionLogs] User inventories found:', userInventories.length);
+
+      console.log(
+        '🔍 [getConsumptionLogs] User inventories found:',
+        userInventories.length,
+      );
       console.log('🔍 [getConsumptionLogs] User inventories:', userInventories);
 
       // Initialize whereClause first
@@ -574,22 +586,40 @@ export class InventoryService {
 
       // Add inventory filter if specified
       if (filters.inventoryId) {
-        console.log('🔍 [getConsumptionLogs] Filtering by specific inventory ID:', filters.inventoryId);
-        const hasAccess = userInventories.some(inv => inv.id === filters.inventoryId);
-        console.log('🔍 [getConsumptionLogs] User has access to this inventory:', hasAccess);
+        console.log(
+          '🔍 [getConsumptionLogs] Filtering by specific inventory ID:',
+          filters.inventoryId,
+        );
+        const hasAccess = userInventories.some(
+          inv => inv.id === filters.inventoryId,
+        );
+        console.log(
+          '🔍 [getConsumptionLogs] User has access to this inventory:',
+          hasAccess,
+        );
         if (!hasAccess) {
-          console.log('⚠️ [getConsumptionLogs] User does not have access to inventory:', filters.inventoryId);
-          console.log('⚠️ [getConsumptionLogs] Returning empty array instead of error');
+          console.log(
+            '⚠️ [getConsumptionLogs] User does not have access to inventory:',
+            filters.inventoryId,
+          );
+          console.log(
+            '⚠️ [getConsumptionLogs] Returning empty array instead of error',
+          );
           return []; // Return empty array instead of throwing error
         }
         whereClause.inventoryId = filters.inventoryId;
       } else {
-        console.log('🔍 [getConsumptionLogs] No specific inventory filter - will fetch from all user inventories');
+        console.log(
+          '🔍 [getConsumptionLogs] No specific inventory filter - will fetch from all user inventories',
+        );
       }
 
       // Add date range filters if specified
       if (filters.startDate) {
-        console.log('🔍 [getConsumptionLogs] Adding startDate filter:', filters.startDate);
+        console.log(
+          '🔍 [getConsumptionLogs] Adding startDate filter:',
+          filters.startDate,
+        );
         whereClause.consumedAt = {
           ...whereClause.consumedAt,
           gte: filters.startDate,
@@ -597,14 +627,20 @@ export class InventoryService {
       }
 
       if (filters.endDate) {
-        console.log('🔍 [getConsumptionLogs] Adding endDate filter:', filters.endDate);
+        console.log(
+          '🔍 [getConsumptionLogs] Adding endDate filter:',
+          filters.endDate,
+        );
         whereClause.consumedAt = {
           ...whereClause.consumedAt,
           lte: filters.endDate,
         };
       }
 
-      console.log('🔍 [getConsumptionLogs] Final where clause:', JSON.stringify(whereClause, null, 2));
+      console.log(
+        '🔍 [getConsumptionLogs] Final where clause:',
+        JSON.stringify(whereClause, null, 2),
+      );
 
       console.log('🔍 [getConsumptionLogs] Executing database query...');
       const consumptionLogs = await prisma.consumptionLog.findMany({
@@ -632,12 +668,18 @@ export class InventoryService {
         },
       });
 
-      console.log('🔍 [getConsumptionLogs] Found consumption logs count:', consumptionLogs.length);
+      console.log(
+        '🔍 [getConsumptionLogs] Found consumption logs count:',
+        consumptionLogs.length,
+      );
       console.log('🔍 [getConsumptionLogs] === END CONSUMPTION LOGS DEBUG ===');
 
       return consumptionLogs;
     } catch (error) {
-      console.error('❌ [getConsumptionLogs] Error in getConsumptionLogs:', error);
+      console.error(
+        '❌ [getConsumptionLogs] Error in getConsumptionLogs:',
+        error,
+      );
       if (error instanceof Error) {
         console.error('❌ [getConsumptionLogs] Error stack:', error.stack);
         console.error('❌ [getConsumptionLogs] Error message:', error.message);

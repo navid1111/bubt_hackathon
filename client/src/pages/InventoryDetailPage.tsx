@@ -717,10 +717,18 @@ export default function InventoryDetailPage() {
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-primary text-primary-foreground hover:bg-primary/90'
                     }`}
-                    title={item.id.startsWith('temp-') ? 'Item is being saved, please wait...' : undefined}
+                    title={
+                      item.id.startsWith('temp-')
+                        ? 'Item is being saved, please wait...'
+                        : undefined
+                    }
                   >
                     <Utensils className="w-4 h-4" />
-                    {item.quantity <= 0 ? 'Out of Stock' : item.id.startsWith('temp-') ? 'Saving...' : 'Consume'}
+                    {item.quantity <= 0
+                      ? 'Out of Stock'
+                      : item.id.startsWith('temp-')
+                      ? 'Saving...'
+                      : 'Consume'}
                   </button>
                 </div>
               );

@@ -391,12 +391,17 @@ export function useInventory() {
 
           const url = `/inventories/consumption?${params.toString()}`;
           console.log('Making request to:', url);
-          console.log('Full URL with base:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}${url}`);
-          
+          console.log(
+            'Full URL with base:',
+            `${
+              import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+            }${url}`,
+          );
+
           const response = await fetchWithAuth(url);
           console.log('Response received:', response);
           console.log('=== END FRONTEND REQUEST ===');
-          
+
           return response.consumptionLogs || [];
         } catch (error) {
           console.error('Error fetching consumption logs:', error);

@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
 import { InventoryService } from './inventory-service';
-import { 
-  InventoryRequest, 
-  UpdateInventoryRequest, 
-  InventoryItemRequest, 
-  UpdateInventoryItemRequest, 
-  ConsumptionLogRequest,
+import {
   ConsumptionLogFilters,
-  InventoryItemFilters
+  ConsumptionLogRequest,
+  InventoryItemFilters,
+  InventoryItemRequest,
+  InventoryRequest,
+  UpdateInventoryItemRequest,
+  UpdateInventoryRequest,
 } from './inventory-types';
 
 export class InventoryController {
@@ -26,7 +26,9 @@ export class InventoryController {
         return;
       }
 
-      const inventories = await this.inventoryService.getUserInventories(userId);
+      const inventories = await this.inventoryService.getUserInventories(
+        userId,
+      );
       res.status(200).json({ inventories });
     } catch (error) {
       console.error('Error getting inventories:', error);
@@ -39,7 +41,7 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { inventoryId } = req.params;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -50,7 +52,10 @@ export class InventoryController {
         return;
       }
 
-      const inventory = await this.inventoryService.getInventoryById(inventoryId, userId);
+      const inventory = await this.inventoryService.getInventoryById(
+        inventoryId,
+        userId,
+      );
       if (!inventory) {
         res.status(404).json({ error: 'Inventory not found' });
         return;
@@ -68,7 +73,7 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { name, description, isPrivate }: InventoryRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -98,7 +103,7 @@ export class InventoryController {
       const userId = req.auth?.userId;
       const { inventoryId } = req.params;
       const { name, description, isPrivate }: UpdateInventoryRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -112,7 +117,7 @@ export class InventoryController {
       const updatedInventory = await this.inventoryService.updateInventory(
         inventoryId,
         userId,
-        { name, description, isPrivate }
+        { name, description, isPrivate },
       );
 
       res.status(200).json(updatedInventory);
@@ -127,7 +132,7 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { inventoryId } = req.params;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -151,15 +156,15 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { inventoryId } = req.params;
-      const { 
-        foodItemId, 
-        customName, 
-        quantity, 
-        unit, 
-        expiryDate, 
-        notes 
+      const {
+        foodItemId,
+        customName,
+        quantity,
+        unit,
+        expiryDate,
+        notes,
       }: InventoryItemRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -172,31 +177,45 @@ export class InventoryController {
 
       // Validate required fields
       if (!quantity || quantity <= 0) {
-        res.status(400).json({ error: 'Quantity is required and must be greater than 0' });
+        res
+          .status(400)
+          .json({ error: 'Quantity is required and must be greater than 0' });
         return;
       }
 
       // If no foodItemId is provided, customName is required
       if (!foodItemId && (!customName || customName.trim().length === 0)) {
-        res.status(400).json({ error: 'Either foodItemId or customName is required' });
+        res
+          .status(400)
+          .json({ error: 'Either foodItemId or customName is required' });
         return;
       }
 
-      const newItem = await this.inventoryService.addInventoryItem(userId, inventoryId, {
-        foodItemId,
-        customName,
-        quantity,
-        unit,
-        expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-        notes,
-      });
+      const newItem = await this.inventoryService.addInventoryItem(
+        userId,
+        inventoryId,
+        {
+          foodItemId,
+          customName,
+          quantity,
+          unit,
+          expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+          notes,
+        },
+      );
 
       res.status(201).json(newItem);
     } catch (error) {
       console.error('Error adding inventory item:', error);
-      if (error instanceof Error && error.message.includes('Inventory not found')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Inventory not found')
+      ) {
         res.status(404).json({ error: error.message });
-      } else if (error instanceof Error && error.message.includes('Food item not found')) {
+      } else if (
+        error instanceof Error &&
+        error.message.includes('Food item not found')
+      ) {
         res.status(404).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'Internal server error' });
@@ -209,25 +228,23 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { inventoryId, itemId } = req.params;
-      const { 
-        quantity, 
-        unit, 
-        expiryDate, 
-        notes 
-      }: UpdateInventoryItemRequest = req.body;
-      
+      const { quantity, unit, expiryDate, notes }: UpdateInventoryItemRequest =
+        req.body;
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
       if (!inventoryId || !itemId) {
-        res.status(400).json({ error: 'Inventory ID and Item ID are required' });
+        res
+          .status(400)
+          .json({ error: 'Inventory ID and Item ID are required' });
         return;
       }
 
       // Validate quantity if provided
-      if (quantity !== undefined && (quantity < 0)) {
+      if (quantity !== undefined && quantity < 0) {
         res.status(400).json({ error: 'Quantity cannot be negative' });
         return;
       }
@@ -236,13 +253,21 @@ export class InventoryController {
         userId,
         inventoryId,
         itemId,
-        { quantity, unit, expiryDate: expiryDate ? new Date(expiryDate) : undefined, notes }
+        {
+          quantity,
+          unit,
+          expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+          notes,
+        },
       );
 
       res.status(200).json(updatedItem);
     } catch (error) {
       console.error('Error updating inventory item:', error);
-      if (error instanceof Error && error.message.includes('Inventory item not found')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Inventory item not found')
+      ) {
         res.status(404).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'Internal server error' });
@@ -255,22 +280,31 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { inventoryId, itemId } = req.params;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
       if (!inventoryId || !itemId) {
-        res.status(400).json({ error: 'Inventory ID and Item ID are required' });
+        res
+          .status(400)
+          .json({ error: 'Inventory ID and Item ID are required' });
         return;
       }
 
-      await this.inventoryService.removeInventoryItem(userId, inventoryId, itemId);
+      await this.inventoryService.removeInventoryItem(
+        userId,
+        inventoryId,
+        itemId,
+      );
       res.status(204).send();
     } catch (error) {
       console.error('Error removing inventory item:', error);
-      if (error instanceof Error && error.message.includes('Inventory item not found')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Inventory item not found')
+      ) {
         res.status(404).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'Internal server error' });
@@ -284,7 +318,7 @@ export class InventoryController {
       const userId = req.auth?.userId;
       const { inventoryId } = req.params;
       const { category, expiringSoon } = req.query;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -319,7 +353,7 @@ export class InventoryController {
   logConsumption = async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.auth?.userId;
-      const { 
+      const {
         inventoryId,
         inventoryItemId,
         foodItemId,
@@ -327,9 +361,9 @@ export class InventoryController {
         quantity,
         unit,
         consumedAt,
-        notes
+        notes,
       }: ConsumptionLogRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -347,21 +381,26 @@ export class InventoryController {
       }
 
       if (!quantity || quantity <= 0) {
-        res.status(400).json({ error: 'Quantity is required and must be greater than 0' });
+        res
+          .status(400)
+          .json({ error: 'Quantity is required and must be greater than 0' });
         return;
       }
-      
-      const consumptionLog = await this.inventoryService.logConsumption(userId, {
-        inventoryId,
-        inventoryItemId,
-        foodItemId,
-        itemName,
-        quantity,
-        unit,
-        consumedAt: consumedAt ? new Date(consumedAt) : undefined,
-        notes,
-      });
-      
+
+      const consumptionLog = await this.inventoryService.logConsumption(
+        userId,
+        {
+          inventoryId,
+          inventoryItemId,
+          foodItemId,
+          itemName,
+          quantity,
+          unit,
+          consumedAt: consumedAt ? new Date(consumedAt) : undefined,
+          notes,
+        },
+      );
+
       res.status(201).json(consumptionLog);
     } catch (error) {
       console.error('Error logging consumption:', error);
@@ -388,11 +427,11 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { startDate, endDate, inventoryId } = req.query;
-      
+
       console.log('=== CONSUMPTION LOGS CONTROLLER ===');
       console.log('User ID:', userId);
       console.log('Filters:', { startDate, endDate, inventoryId });
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -412,10 +451,13 @@ export class InventoryController {
         filters.inventoryId = inventoryId as string;
       }
 
-      const consumptionLogs = await this.inventoryService.getConsumptionLogs(userId, filters);
+      const consumptionLogs = await this.inventoryService.getConsumptionLogs(
+        userId,
+        filters,
+      );
       console.log('Returning', consumptionLogs.length, 'consumption logs');
       console.log('=== END CONTROLLER ===');
-      
+
       res.status(200).json({ consumptionLogs });
     } catch (error) {
       console.error('ERROR in getConsumptionLogs controller:', error);
@@ -428,7 +470,7 @@ export class InventoryController {
     try {
       const userId = req.auth?.userId;
       const { startDate, endDate, inventoryId } = req.query;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -443,9 +485,9 @@ export class InventoryController {
         userId,
         new Date(startDate as string),
         new Date(endDate as string),
-        inventoryId as string
+        inventoryId as string,
       );
-      
+
       res.status(200).json({ trends });
     } catch (error) {
       console.error('Error getting inventory trends:', error);
@@ -454,11 +496,14 @@ export class InventoryController {
   };
 
   // Get consumption patterns for analytics
-  getConsumptionPatterns = async (req: Request, res: Response): Promise<void> => {
+  getConsumptionPatterns = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       const userId = req.auth?.userId;
       const { startDate, endDate } = req.query;
-      
+
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -472,9 +517,9 @@ export class InventoryController {
       const patterns = await this.inventoryService.getConsumptionPatterns(
         userId,
         new Date(startDate as string),
-        new Date(endDate as string)
+        new Date(endDate as string),
       );
-      
+
       res.status(200).json({ patterns });
     } catch (error) {
       console.error('Error getting consumption patterns:', error);

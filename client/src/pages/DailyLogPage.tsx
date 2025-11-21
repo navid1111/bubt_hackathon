@@ -24,8 +24,13 @@ export default function DailyLogPage() {
   });
 
   const { useGetConsumptionLogs, useGetInventories } = useInventory();
-  const { data: inventories, isLoading: inventoriesLoading } = useGetInventories();
-  const { data: consumptionLogs, isLoading, error } = useGetConsumptionLogs({
+  const { data: inventories, isLoading: inventoriesLoading } =
+    useGetInventories();
+  const {
+    data: consumptionLogs,
+    isLoading,
+    error,
+  } = useGetConsumptionLogs({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
     inventoryId: filters.inventoryId || undefined,
@@ -382,9 +387,12 @@ export default function DailyLogPage() {
           ) : error ? (
             <div className="text-center py-12">
               <ChefHat className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">Unable to load consumption logs</h3>
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Unable to load consumption logs
+              </h3>
               <p className="text-foreground/60 mb-4">
-                There was an error loading your consumption data. Please try again.
+                There was an error loading your consumption data. Please try
+                again.
               </p>
               <button
                 onClick={() => window.location.reload()}
