@@ -2,6 +2,7 @@ import { UserButton, useClerk, useUser } from '@clerk/clerk-react';
 import {
   BookMarked,
   BookOpen,
+  Brain,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -19,6 +20,11 @@ const navItems = [
     label: 'Dashboard',
     to: '/dashboard',
     icon: LayoutDashboard,
+  },
+  {
+    label: 'AI Intelligence',
+    to: '/intelligence',
+    icon: Brain,
   },
   {
     label: 'Daily Log',
@@ -200,7 +206,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             </button>
           </div>
 
-          {/* Clerk User Button (only when expanded) */}
+          {/* Clerk User Button (only when expanded)
           {!collapsed && (
             <div className="mt-3 pt-3 border-t border-border">
               <div className="flex items-center gap-3 px-3">
@@ -221,7 +227,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                 </div>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </aside>
