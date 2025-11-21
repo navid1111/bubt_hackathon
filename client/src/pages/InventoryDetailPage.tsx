@@ -3,10 +3,12 @@ import {
   Apple,
   ArrowLeft,
   Calendar,
+  Filter,
   Package,
   Plus,
   ShoppingCart,
   Utensils,
+  X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -60,6 +62,12 @@ export default function InventoryDetailPage() {
   const [showConsumptionModal, setShowConsumptionModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    category: '',
+    expiryStatus: '',
+    stockLevel: '',
+  });
 
   const {
     useGetInventories,
@@ -161,10 +169,64 @@ export default function InventoryDetailPage() {
   const filteredItems = (inventoryItems || []).filter(item => {
     const itemName = item.customName || item.foodItem?.name || '';
     const itemNotes = item.notes || '';
-    return (
+    const itemCategory =
+      item.foodItem?.category || (item.foodItemId ? 'uncategorized' : 'custom');
+
+    // Text search filter
+    const matchesSearch =
       itemName.toLowerCase().includes(search.toLowerCase()) ||
-      itemNotes.toLowerCase().includes(search.toLowerCase())
-    );
+      itemNotes.toLowerCase().includes(search.toLowerCase());
+
+    // Category filter
+    const matchesCategory =
+      !filters.category || itemCategory === filters.category;
+
+    // Expiry status filter
+    let matchesExpiry = true;
+    if (filters.expiryStatus) {
+      const today = new Date();
+      if (item.expiryDate) {
+        const expDate = new Date(item.expiryDate);
+        const diffTime = expDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        switch (filters.expiryStatus) {
+          case 'expired':
+            matchesExpiry = diffDays < 0;
+            break;
+          case 'expiring-soon':
+            matchesExpiry = diffDays >= 0 && diffDays <= 3;
+            break;
+          case 'fresh':
+            matchesExpiry = diffDays > 3;
+            break;
+          default:
+            matchesExpiry = true;
+        }
+      } else {
+        matchesExpiry = filters.expiryStatus === 'no-expiry';
+      }
+    }
+
+    // Stock level filter
+    let matchesStock = true;
+    if (filters.stockLevel) {
+      switch (filters.stockLevel) {
+        case 'out-of-stock':
+          matchesStock = item.quantity <= 0;
+          break;
+        case 'low-stock':
+          matchesStock = item.quantity > 0 && item.quantity <= 2;
+          break;
+        case 'in-stock':
+          matchesStock = item.quantity > 2;
+          break;
+        default:
+          matchesStock = true;
+      }
+    }
+
+    return matchesSearch && matchesCategory && matchesExpiry && matchesStock;
   });
 
   const handleConsumption = (item: InventoryItem) => {
@@ -198,6 +260,31 @@ export default function InventoryDetailPage() {
       console.error('Error logging consumption:', error);
     }
   };
+
+  const clearFilters = () => {
+    setFilters({
+      category: '',
+      expiryStatus: '',
+      stockLevel: '',
+    });
+    setSearch('');
+  };
+
+  const hasActiveFilters =
+    filters.category || filters.expiryStatus || filters.stockLevel || search;
+
+  // Get unique categories from inventory items
+  const availableCategories = Array.from(
+    new Set(
+      (inventoryItems || [])
+        .map(
+          item =>
+            item.foodItem?.category ||
+            (item.foodItemId ? 'uncategorized' : 'custom'),
+        )
+        .filter(Boolean),
+    ),
+  ).sort();
 
   return (
     <div className="min-h-screen bg-background">
@@ -289,15 +376,211 @@ export default function InventoryDetailPage() {
           </div>
         </div>
 
-        {/* Search bar */}
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search items in this inventory..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
-          />
+        {/* Search and Filter Section */}
+        <div className="mb-6 space-y-4">
+          {/* Search Bar and Filter Toggle */}
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search items in this inventory..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground pr-10"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-foreground/40 hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 border border-border rounded-lg transition-colors flex items-center gap-2 ${
+                showFilters || hasActiveFilters
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-foreground hover:bg-secondary/10'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="bg-primary-foreground text-primary rounded-full w-5 h-5 text-xs flex items-center justify-center font-semibold">
+                  {
+                    [
+                      filters.category,
+                      filters.expiryStatus,
+                      filters.stockLevel,
+                      search,
+                    ].filter(Boolean).length
+                  }
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-foreground">Filter Items</h3>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-sm text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Category Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={e =>
+                      setFilters(prev => ({
+                        ...prev,
+                        category: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                  >
+                    <option value="">All Categories</option>
+                    {availableCategories.map(category => (
+                      <option key={category} value={category}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Expiry Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Expiry Status
+                  </label>
+                  <select
+                    value={filters.expiryStatus}
+                    onChange={e =>
+                      setFilters(prev => ({
+                        ...prev,
+                        expiryStatus: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                  >
+                    <option value="">All Items</option>
+                    <option value="expired">Expired</option>
+                    <option value="expiring-soon">
+                      Expiring Soon ({'≤'}3 days)
+                    </option>
+                    <option value="fresh">Fresh ({'>'}3 days)</option>
+                    <option value="no-expiry">No Expiry Date</option>
+                  </select>
+                </div>
+
+                {/* Stock Level Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Stock Level
+                  </label>
+                  <select
+                    value={filters.stockLevel}
+                    onChange={e =>
+                      setFilters(prev => ({
+                        ...prev,
+                        stockLevel: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                  >
+                    <option value="">All Stock Levels</option>
+                    <option value="out-of-stock">Out of Stock</option>
+                    <option value="low-stock">Low Stock ({'≤'}2)</option>
+                    <option value="in-stock">In Stock ({'>'}2)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Active Filter Tags */}
+              {hasActiveFilters && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                  <span className="text-sm text-foreground/70">
+                    Active filters:
+                  </span>
+                  {search && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      Search: "{search}"
+                      <button
+                        onClick={() => setSearch('')}
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.category && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      {filters.category.charAt(0).toUpperCase() +
+                        filters.category.slice(1)}
+                      <button
+                        onClick={() =>
+                          setFilters(prev => ({ ...prev, category: '' }))
+                        }
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.expiryStatus && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      {filters.expiryStatus
+                        .split('-')
+                        .map(
+                          word => word.charAt(0).toUpperCase() + word.slice(1),
+                        )
+                        .join(' ')}
+                      <button
+                        onClick={() =>
+                          setFilters(prev => ({ ...prev, expiryStatus: '' }))
+                        }
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.stockLevel && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      {filters.stockLevel
+                        .split('-')
+                        .map(
+                          word => word.charAt(0).toUpperCase() + word.slice(1),
+                        )
+                        .join(' ')}
+                      <button
+                        onClick={() =>
+                          setFilters(prev => ({ ...prev, stockLevel: '' }))
+                        }
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {itemsLoading ? (
@@ -308,11 +591,23 @@ export default function InventoryDetailPage() {
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">
-              No items yet
+              {hasActiveFilters
+                ? 'No items match your filters'
+                : 'No items yet'}
             </h3>
             <p className="text-foreground/60 mb-4">
-              Add food items to this inventory
+              {hasActiveFilters
+                ? 'Try adjusting your search or filter criteria'
+                : 'Add food items to this inventory'}
             </p>
+            {hasActiveFilters ? (
+              <button
+                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-smooth font-medium mr-2"
+                onClick={clearFilters}
+              >
+                Clear Filters
+              </button>
+            ) : null}
             <button
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium"
               onClick={() => setShowAddModal(true)}
