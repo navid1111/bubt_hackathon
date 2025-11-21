@@ -1,8 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Plus, Package, Calendar, AlertCircle, Apple, ShoppingCart, Utensils, ArrowLeft } from 'lucide-react';
-import { useInventory } from '../hooks/useInventory';
+import {
+  AlertCircle,
+  Apple,
+  ArrowLeft,
+  Calendar,
+  Filter,
+  Package,
+  Plus,
+  ShoppingCart,
+  Utensils,
+  X,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '@clerk/clerk-react';
+import { useInventory } from '../hooks/useInventory';
 
 export interface Inventory {
   id: string;
@@ -23,10 +33,10 @@ export interface InventoryItem {
   expiryDate?: string;
   notes?: string;
   foodItem?: {
-    id: string;
+    id?: string;
     name: string;
     category: string;
-    unit: string;
+    unit?: string;
     typicalExpirationDays?: number;
     description?: string;
   };
@@ -49,12 +59,27 @@ export default function InventoryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showConsumptionModal, setShowConsumptionModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    category: '',
+    expiryStatus: '',
+    stockLevel: '',
+  });
 
-  const { useGetInventories, useGetInventoryItems, useAddItemToInventory } = useInventory();
+  const {
+    useGetInventories,
+    useGetInventoryItems,
+    useAddItemToInventory,
+    useLogConsumption,
+  } = useInventory();
   const { data: inventories, isLoading } = useGetInventories();
-  const { data: inventoryItems, isLoading: itemsLoading } = useGetInventoryItems(inventoryId!);
+  const { data: inventoryItems, isLoading: itemsLoading } =
+    useGetInventoryItems(inventoryId!);
   const addItemMutation = useAddItemToInventory(inventoryId!);
+  const logConsumptionMutation = useLogConsumption(inventoryId!);
 
   useEffect(() => {
     if (!inventoryId) {
@@ -69,7 +94,7 @@ export default function InventoryDetailPage() {
     try {
       // Find the specific inventory from the list of all inventories
       if (inventories) {
-        const foundInventory = inventories.find((inv) => inv.id === inventoryId);
+        const foundInventory = inventories.find(inv => inv.id === inventoryId);
         if (foundInventory) {
           setInventory(foundInventory);
           setLoading(false);
@@ -104,7 +129,9 @@ export default function InventoryDetailPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center p-6 bg-red-50 border border-red-200 rounded-xl max-w-md">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Inventory</h3>
+          <h3 className="text-lg font-medium text-red-800 mb-2">
+            Error Loading Inventory
+          </h3>
           <p className="text-red-600 mb-4">{error}</p>
           <button
             onClick={() => navigate('/inventory')}
@@ -122,8 +149,12 @@ export default function InventoryDetailPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center p-6 bg-card border border-border rounded-xl max-w-md">
           <Package className="w-12 h-12 text-foreground/70 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-foreground mb-2">Inventory Not Found</h3>
-          <p className="text-foreground/70 mb-4">The requested inventory could not be found.</p>
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            Inventory Not Found
+          </h3>
+          <p className="text-foreground/70 mb-4">
+            The requested inventory could not be found.
+          </p>
           <button
             onClick={() => navigate('/inventory')}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth"
@@ -138,9 +169,122 @@ export default function InventoryDetailPage() {
   const filteredItems = (inventoryItems || []).filter(item => {
     const itemName = item.customName || item.foodItem?.name || '';
     const itemNotes = item.notes || '';
-    return itemName.toLowerCase().includes(search.toLowerCase()) ||
-           itemNotes.toLowerCase().includes(search.toLowerCase());
+    const itemCategory =
+      item.foodItem?.category || (item.foodItemId ? 'uncategorized' : 'custom');
+
+    // Text search filter
+    const matchesSearch =
+      itemName.toLowerCase().includes(search.toLowerCase()) ||
+      itemNotes.toLowerCase().includes(search.toLowerCase());
+
+    // Category filter
+    const matchesCategory =
+      !filters.category || itemCategory === filters.category;
+
+    // Expiry status filter
+    let matchesExpiry = true;
+    if (filters.expiryStatus) {
+      const today = new Date();
+      if (item.expiryDate) {
+        const expDate = new Date(item.expiryDate);
+        const diffTime = expDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        switch (filters.expiryStatus) {
+          case 'expired':
+            matchesExpiry = diffDays < 0;
+            break;
+          case 'expiring-soon':
+            matchesExpiry = diffDays >= 0 && diffDays <= 3;
+            break;
+          case 'fresh':
+            matchesExpiry = diffDays > 3;
+            break;
+          default:
+            matchesExpiry = true;
+        }
+      } else {
+        matchesExpiry = filters.expiryStatus === 'no-expiry';
+      }
+    }
+
+    // Stock level filter
+    let matchesStock = true;
+    if (filters.stockLevel) {
+      switch (filters.stockLevel) {
+        case 'out-of-stock':
+          matchesStock = item.quantity <= 0;
+          break;
+        case 'low-stock':
+          matchesStock = item.quantity > 0 && item.quantity <= 2;
+          break;
+        case 'in-stock':
+          matchesStock = item.quantity > 2;
+          break;
+        default:
+          matchesStock = true;
+      }
+    }
+
+    return matchesSearch && matchesCategory && matchesExpiry && matchesStock;
   });
+
+  const handleConsumption = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setShowConsumptionModal(true);
+  };
+
+  const handleConsumptionSubmit = async (consumptionData: {
+    quantity: number;
+    unit?: string;
+    notes?: string;
+  }) => {
+    if (!selectedItem) return;
+
+    const itemName =
+      selectedItem.customName || selectedItem.foodItem?.name || 'Unknown Item';
+
+    try {
+      await logConsumptionMutation.mutateAsync({
+        inventoryId: inventoryId!,
+        inventoryItemId: selectedItem.id,
+        foodItemId: selectedItem.foodItemId,
+        itemName,
+        quantity: consumptionData.quantity,
+        unit: consumptionData.unit || selectedItem.unit,
+        notes: consumptionData.notes,
+      });
+      setShowConsumptionModal(false);
+      setSelectedItem(null);
+    } catch (error) {
+      console.error('Error logging consumption:', error);
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      category: '',
+      expiryStatus: '',
+      stockLevel: '',
+    });
+    setSearch('');
+  };
+
+  const hasActiveFilters =
+    filters.category || filters.expiryStatus || filters.stockLevel || search;
+
+  // Get unique categories from inventory items
+  const availableCategories = Array.from(
+    new Set(
+      (inventoryItems || [])
+        .map(
+          item =>
+            item.foodItem?.category ||
+            (item.foodItemId ? 'uncategorized' : 'custom'),
+        )
+        .filter(Boolean),
+    ),
+  ).sort();
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,7 +298,9 @@ export default function InventoryDetailPage() {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex-1">
-            <h1 className="font-bold text-lg text-foreground">{inventory.name}</h1>
+            <h1 className="font-bold text-lg text-foreground">
+              {inventory.name}
+            </h1>
             <p className="text-sm text-foreground/70">
               {inventory.description || 'Manage your food items'}
             </p>
@@ -178,7 +324,9 @@ export default function InventoryDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-foreground/70">Total Items</p>
-                <p className="text-2xl font-bold text-foreground">{(inventoryItems || []).length}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {(inventoryItems || []).length}
+                </p>
               </div>
             </div>
           </div>
@@ -191,10 +339,12 @@ export default function InventoryDetailPage() {
               <div>
                 <p className="text-sm text-foreground/70">Fruits & Veggies</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {(inventoryItems || []).filter(i => {
-                    const category = i.foodItem?.category;
-                    return ['fruit', 'vegetable'].includes(category || '');
-                  }).length}
+                  {
+                    (inventoryItems || []).filter(i => {
+                      const category = i.foodItem?.category;
+                      return ['fruit', 'vegetable'].includes(category || '');
+                    }).length
+                  }
                 </p>
               </div>
             </div>
@@ -208,38 +358,256 @@ export default function InventoryDetailPage() {
               <div>
                 <p className="text-sm text-foreground/70">Expiring Soon</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {(inventoryItems || []).filter(i => {
-                    if (!i.expiryDate) return false;
-                    const expDate = new Date(i.expiryDate);
-                    const today = new Date();
-                    const diffTime = expDate.getTime() - today.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays <= 3 && diffDays >= 0;
-                  }).length}
+                  {
+                    (inventoryItems || []).filter(i => {
+                      if (!i.expiryDate) return false;
+                      const expDate = new Date(i.expiryDate);
+                      const today = new Date();
+                      const diffTime = expDate.getTime() - today.getTime();
+                      const diffDays = Math.ceil(
+                        diffTime / (1000 * 60 * 60 * 24),
+                      );
+                      return diffDays <= 3 && diffDays >= 0;
+                    }).length
+                  }
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Search bar */}
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search items in this inventory..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
-          />
+        {/* Search and Filter Section */}
+        <div className="mb-6 space-y-4">
+          {/* Search Bar and Filter Toggle */}
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search items in this inventory..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground pr-10"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-foreground/40 hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 border border-border rounded-lg transition-colors flex items-center gap-2 ${
+                showFilters || hasActiveFilters
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-foreground hover:bg-secondary/10'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="bg-primary-foreground text-primary rounded-full w-5 h-5 text-xs flex items-center justify-center font-semibold">
+                  {
+                    [
+                      filters.category,
+                      filters.expiryStatus,
+                      filters.stockLevel,
+                      search,
+                    ].filter(Boolean).length
+                  }
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-foreground">Filter Items</h3>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-sm text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Category Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={e =>
+                      setFilters(prev => ({
+                        ...prev,
+                        category: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                  >
+                    <option value="">All Categories</option>
+                    {availableCategories.map(category => (
+                      <option key={category} value={category}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Expiry Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Expiry Status
+                  </label>
+                  <select
+                    value={filters.expiryStatus}
+                    onChange={e =>
+                      setFilters(prev => ({
+                        ...prev,
+                        expiryStatus: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                  >
+                    <option value="">All Items</option>
+                    <option value="expired">Expired</option>
+                    <option value="expiring-soon">
+                      Expiring Soon ({'≤'}3 days)
+                    </option>
+                    <option value="fresh">Fresh ({'>'}3 days)</option>
+                    <option value="no-expiry">No Expiry Date</option>
+                  </select>
+                </div>
+
+                {/* Stock Level Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Stock Level
+                  </label>
+                  <select
+                    value={filters.stockLevel}
+                    onChange={e =>
+                      setFilters(prev => ({
+                        ...prev,
+                        stockLevel: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                  >
+                    <option value="">All Stock Levels</option>
+                    <option value="out-of-stock">Out of Stock</option>
+                    <option value="low-stock">Low Stock ({'≤'}2)</option>
+                    <option value="in-stock">In Stock ({'>'}2)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Active Filter Tags */}
+              {hasActiveFilters && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                  <span className="text-sm text-foreground/70">
+                    Active filters:
+                  </span>
+                  {search && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      Search: "{search}"
+                      <button
+                        onClick={() => setSearch('')}
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.category && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      {filters.category.charAt(0).toUpperCase() +
+                        filters.category.slice(1)}
+                      <button
+                        onClick={() =>
+                          setFilters(prev => ({ ...prev, category: '' }))
+                        }
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.expiryStatus && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      {filters.expiryStatus
+                        .split('-')
+                        .map(
+                          word => word.charAt(0).toUpperCase() + word.slice(1),
+                        )
+                        .join(' ')}
+                      <button
+                        onClick={() =>
+                          setFilters(prev => ({ ...prev, expiryStatus: '' }))
+                        }
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.stockLevel && (
+                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
+                      {filters.stockLevel
+                        .split('-')
+                        .map(
+                          word => word.charAt(0).toUpperCase() + word.slice(1),
+                        )
+                        .join(' ')}
+                      <button
+                        onClick={() =>
+                          setFilters(prev => ({ ...prev, stockLevel: '' }))
+                        }
+                        className="hover:bg-primary/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {itemsLoading ? (
-          <div className="text-center py-12 text-foreground/60">Loading items...</div>
+          <div className="text-center py-12 text-foreground/60">
+            Loading items...
+          </div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">No items yet</h3>
-            <p className="text-foreground/60 mb-4">Add food items to this inventory</p>
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              {hasActiveFilters
+                ? 'No items match your filters'
+                : 'No items yet'}
+            </h3>
+            <p className="text-foreground/60 mb-4">
+              {hasActiveFilters
+                ? 'Try adjusting your search or filter criteria'
+                : 'Add food items to this inventory'}
+            </p>
+            {hasActiveFilters ? (
+              <button
+                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-smooth font-medium mr-2"
+                onClick={clearFilters}
+              >
+                Clear Filters
+              </button>
+            ) : null}
             <button
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium"
               onClick={() => setShowAddModal(true)}
@@ -250,21 +618,43 @@ export default function InventoryDetailPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map(item => {
-              const itemName = item.customName || item.foodItem?.name || 'Unknown Item';
-              const itemCategory = item.foodItem?.category || (item.foodItemId ? 'uncategorized' : 'custom');
-              
+              const itemName =
+                item.customName || item.foodItem?.name || 'Unknown Item';
+              const itemCategory =
+                item.foodItem?.category ||
+                (item.foodItemId ? 'uncategorized' : 'custom');
+
               return (
-                <div key={item.id} className="bg-card rounded-xl border border-border p-6 shadow hover:shadow-lg transition-smooth">
+                <div
+                  key={item.id}
+                  className="bg-card rounded-xl border border-border p-6 shadow hover:shadow-lg transition-smooth"
+                >
                   <div className="flex items-center gap-3 mb-2">
-                    {itemCategory === 'fruit' && <Apple className="w-6 h-6 text-primary" />}
-                    {itemCategory === 'vegetable' && <ShoppingCart className="w-6 h-6 text-primary" />}
-                    {itemCategory === 'dairy' && <Utensils className="w-6 h-6 text-primary" />}
-                    {itemCategory === 'grain' && <Package className="w-6 h-6 text-primary" />}
-                    {itemCategory === 'protein' && <Package className="w-6 h-6 text-primary" />}
-                    {itemCategory === 'pantry' && <Package className="w-6 h-6 text-primary" />}
-                    {itemCategory === 'custom' && <AlertCircle className="w-6 h-6 text-orange-500" />}
+                    {itemCategory === 'fruit' && (
+                      <Apple className="w-6 h-6 text-primary" />
+                    )}
+                    {itemCategory === 'vegetable' && (
+                      <ShoppingCart className="w-6 h-6 text-primary" />
+                    )}
+                    {itemCategory === 'dairy' && (
+                      <Utensils className="w-6 h-6 text-primary" />
+                    )}
+                    {itemCategory === 'grain' && (
+                      <Package className="w-6 h-6 text-primary" />
+                    )}
+                    {itemCategory === 'protein' && (
+                      <Package className="w-6 h-6 text-primary" />
+                    )}
+                    {itemCategory === 'pantry' && (
+                      <Package className="w-6 h-6 text-primary" />
+                    )}
+                    {itemCategory === 'custom' && (
+                      <AlertCircle className="w-6 h-6 text-orange-500" />
+                    )}
                     <div className="flex-1">
-                      <span className="font-bold text-lg text-foreground">{itemName}</span>
+                      <span className="font-bold text-lg text-foreground">
+                        {itemName}
+                      </span>
                       {item.foodItem && (
                         <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                           Linked
@@ -279,15 +669,34 @@ export default function InventoryDetailPage() {
                   </div>
 
                   <div className="mb-3">
-                    <div className="text-foreground font-semibold">{item.quantity} {item.unit}</div>
-                    <div className="text-sm text-foreground/70 capitalize">{itemCategory}</div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-foreground font-semibold">
+                        {item.quantity} {item.unit}
+                      </div>
+                      {item.quantity <= 2 && item.quantity > 0 && (
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                          Low Stock
+                        </span>
+                      )}
+                      {item.quantity === 0 && (
+                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                          Out of Stock
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-foreground/70 capitalize">
+                      {itemCategory}
+                    </div>
                   </div>
 
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-sm mb-4">
                     {item.expiryDate && (
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-foreground/70" />
-                        <span className="text-foreground/70">Expires: {new Date(item.expiryDate).toLocaleDateString()}</span>
+                        <span className="text-foreground/70">
+                          Expires:{' '}
+                          {new Date(item.expiryDate).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                     {item.notes && (
@@ -296,12 +705,38 @@ export default function InventoryDetailPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Consumption Button */}
+                  <button
+                    onClick={() => handleConsumption(item)}
+                    disabled={item.quantity <= 0}
+                    className={`w-full px-3 py-2 rounded-lg transition-smooth font-medium flex items-center justify-center gap-2 ${
+                      item.quantity <= 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    }`}
+                  >
+                    <Utensils className="w-4 h-4" />
+                    {item.quantity <= 0 ? 'Out of Stock' : 'Consume'}
+                  </button>
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Consumption Modal */}
+      {showConsumptionModal && selectedItem && (
+        <ConsumptionModal
+          item={selectedItem}
+          onClose={() => {
+            setShowConsumptionModal(false);
+            setSelectedItem(null);
+          }}
+          onConsume={handleConsumptionSubmit}
+        />
+      )}
 
       {/* Add Item Modal */}
       {showAddModal && (
@@ -310,6 +745,199 @@ export default function InventoryDetailPage() {
           onAdd={addItemMutation.mutate}
         />
       )}
+    </div>
+  );
+}
+
+interface ConsumptionModalProps {
+  item: InventoryItem;
+  onClose: () => void;
+  onConsume: (data: {
+    quantity: number;
+    unit?: string;
+    notes?: string;
+  }) => void;
+}
+
+function ConsumptionModal({ item, onClose, onConsume }: ConsumptionModalProps) {
+  const [form, setForm] = useState({
+    quantity: 1,
+    unit: item.unit || '',
+    notes: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const itemName = item.customName || item.foodItem?.name || 'Unknown Item';
+  const maxQuantity = item.quantity;
+  const remainingAfterConsumption = Math.max(0, maxQuantity - form.quantity);
+  const willBeRemoved = remainingAfterConsumption === 0;
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+    setForm(prev => ({
+      ...prev,
+      [name]: name === 'quantity' ? Number(value) : value,
+    }));
+  };
+
+  const handleConsumeAll = () => {
+    setForm(prev => ({
+      ...prev,
+      quantity: maxQuantity,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    if (form.quantity <= 0) {
+      setError('Quantity must be greater than 0');
+      setLoading(false);
+      return;
+    }
+
+    if (form.quantity > maxQuantity) {
+      setError(`Cannot consume more than ${maxQuantity} ${item.unit}`);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await onConsume({
+        quantity: form.quantity,
+        unit: form.unit,
+        notes: form.notes || undefined,
+      });
+    } catch (err) {
+      console.error('Error logging consumption:', err);
+      setError('Failed to log consumption');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-background/60 backdrop-blur-md flex items-center justify-center z-50">
+      <form
+        className="bg-card rounded-2xl border border-border shadow-xl p-8 w-full max-w-md"
+        onSubmit={handleSubmit}
+      >
+        <h2 className="text-xl font-bold text-foreground mb-4">Consume Item</h2>
+
+        <div className="bg-secondary/10 rounded-lg p-4 mb-4">
+          <h3 className="font-semibold text-foreground">{itemName}</h3>
+          <p className="text-sm text-foreground/70">
+            Available: {maxQuantity} {item.unit}
+          </p>
+          {form.quantity > 0 && (
+            <div className="mt-2 text-sm">
+              <p className="text-foreground/80">
+                After consumption:{' '}
+                <span
+                  className={`font-semibold ${
+                    willBeRemoved ? 'text-orange-600' : 'text-green-600'
+                  }`}
+                >
+                  {remainingAfterConsumption} {item.unit}
+                </span>
+              </p>
+              {willBeRemoved && (
+                <p className="text-orange-600 font-medium mt-1">
+                  ⚠️ This item will be removed from inventory
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="text-red-500 mb-4 p-2 bg-red-50 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-foreground">
+                Quantity *
+              </label>
+              <button
+                type="button"
+                onClick={handleConsumeAll}
+                className="text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
+              >
+                Use All ({maxQuantity})
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                name="quantity"
+                type="number"
+                min="0.1"
+                max={maxQuantity}
+                step="0.1"
+                required
+                value={form.quantity}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              />
+              <input
+                name="unit"
+                placeholder="kg, L, pcs"
+                value={form.unit}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Notes (optional)
+            </label>
+            <textarea
+              name="notes"
+              placeholder="Add any notes about consumption..."
+              value={form.notes}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <button
+            type="submit"
+            disabled={loading}
+            className={`px-4 py-2 rounded-lg transition-smooth font-medium flex-1 ${
+              willBeRemoved
+                ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+            }`}
+          >
+            {loading
+              ? 'Consuming...'
+              : willBeRemoved
+              ? 'Consume & Remove'
+              : 'Consume'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-secondary/10 transition-smooth font-medium flex-1"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -364,19 +992,23 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
     fetchFoodItems();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setForm(prev => ({
         ...prev,
-        [name]: checked
+        [name]: checked,
       }));
     } else {
       setForm(prev => ({
         ...prev,
-        [name]: name === 'quantity' ? Number(value) : value
+        [name]: name === 'quantity' ? Number(value) : value,
       }));
     }
 
@@ -388,9 +1020,14 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
           ...prev,
           unit: selectedFood.unit || '',
           // Auto-calculate expiry date if typical expiration days is available
-          expirationDate: selectedFood.typicalExpirationDays 
-            ? new Date(Date.now() + selectedFood.typicalExpirationDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-            : prev.expirationDate
+          expirationDate: selectedFood.typicalExpirationDays
+            ? new Date(
+                Date.now() +
+                  selectedFood.typicalExpirationDays * 24 * 60 * 60 * 1000,
+              )
+                .toISOString()
+                .split('T')[0]
+            : prev.expirationDate,
         }));
       }
     }
@@ -403,17 +1040,22 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
 
     try {
       const itemData = {
-        foodItemId: form.useCustomItem ? undefined : form.selectedFoodItemId || undefined,
+        foodItemId: form.useCustomItem
+          ? undefined
+          : form.selectedFoodItemId || undefined,
         customName: form.useCustomItem ? form.customName : undefined,
         quantity: form.quantity,
         unit: form.unit,
-        expiryDate: form.expirationDate ? new Date(form.expirationDate) : undefined,
+        expiryDate: form.expirationDate
+          ? new Date(form.expirationDate)
+          : undefined,
         notes: form.notes || undefined,
       };
 
       await onAdd(itemData);
       onClose();
     } catch (err) {
+      console.error('Error adding item:', err);
       setError('Failed to add item');
     } finally {
       setLoading(false);
@@ -426,7 +1068,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
         className="bg-card rounded-2xl border border-border shadow-xl p-8 w-full max-w-md"
         onSubmit={handleSubmit}
       >
-        <h2 className="text-xl font-bold text-foreground mb-4">Add Item to Inventory</h2>
+        <h2 className="text-xl font-bold text-foreground mb-4">
+          Add Item to Inventory
+        </h2>
 
         {error && (
           <div className="text-red-500 mb-4 p-2 bg-red-50 rounded-lg flex items-center gap-2">
@@ -458,7 +1102,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
                 Select Food Item
               </label>
               {loadingFoodItems ? (
-                <div className="text-sm text-foreground/60">Loading food items...</div>
+                <div className="text-sm text-foreground/60">
+                  Loading food items...
+                </div>
               ) : (
                 <select
                   name="selectedFoodItemId"
@@ -512,7 +1158,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-foreground/70 mb-1">Expiration Date</label>
+              <label className="block text-xs text-foreground/70 mb-1">
+                Expiration Date
+              </label>
               <input
                 name="expirationDate"
                 type="date"
@@ -523,7 +1171,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
             </div>
 
             <div>
-              <label className="block text-xs text-foreground/70 mb-1">Purchase Date</label>
+              <label className="block text-xs text-foreground/70 mb-1">
+                Purchase Date
+              </label>
               <input
                 name="purchaseDate"
                 type="date"
@@ -533,8 +1183,6 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
               />
             </div>
           </div>
-
-
 
           <input
             name="location"

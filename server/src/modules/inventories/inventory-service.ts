@@ -1,13 +1,12 @@
 import prisma from '../../config/database';
 import {
-  InventoryRequest,
-  UpdateInventoryRequest,
-  InventoryItemRequest,
-  UpdateInventoryItemRequest,
+  ConsumptionLogFilters,
   ConsumptionLogRequest,
-  InventoryFilters,
   InventoryItemFilters,
-  ConsumptionLogFilters
+  InventoryItemRequest,
+  InventoryRequest,
+  UpdateInventoryItemRequest,
+  UpdateInventoryRequest,
 } from './inventory-types';
 
 export class InventoryService {
@@ -122,7 +121,11 @@ export class InventoryService {
   /**
    * Update an inventory
    */
-  async updateInventory(inventoryId: string, userId: string, data: UpdateInventoryRequest) {
+  async updateInventory(
+    inventoryId: string,
+    userId: string,
+    data: UpdateInventoryRequest,
+  ) {
     // First, find the application user by their Clerk ID
     const user = await prisma.user.findUnique({
       where: { clerkId: userId },
@@ -174,7 +177,11 @@ export class InventoryService {
   /**
    * Add an item to an inventory
    */
-  async addInventoryItem(userId: string, inventoryId: string, data: InventoryItemRequest) {
+  async addInventoryItem(
+    userId: string,
+    inventoryId: string,
+    data: InventoryItemRequest,
+  ) {
     // First, find the application user by their Clerk ID
     const user = await prisma.user.findUnique({
       where: { clerkId: userId },
@@ -268,7 +275,7 @@ export class InventoryService {
     userId: string,
     inventoryId: string,
     itemId: string,
-    data: UpdateInventoryItemRequest
+    data: UpdateInventoryItemRequest,
   ) {
     // First, find the application user by their Clerk ID
     const user = await prisma.user.findUnique({
@@ -312,7 +319,11 @@ export class InventoryService {
   /**
    * Remove an item from an inventory (soft delete)
    */
-  async removeInventoryItem(userId: string, inventoryId: string, itemId: string) {
+  async removeInventoryItem(
+    userId: string,
+    inventoryId: string,
+    itemId: string,
+  ) {
     // First, find the application user by their Clerk ID
     const user = await prisma.user.findUnique({
       where: { clerkId: userId },
@@ -433,7 +444,9 @@ export class InventoryService {
       });
 
       if (!inventoryItem) {
-        throw new Error('Inventory item not found or does not belong to the specified inventory');
+        throw new Error(
+          'Inventory item not found or does not belong to the specified inventory',
+        );
       }
     }
 
@@ -467,15 +480,32 @@ export class InventoryService {
 
     // Update inventory quantity if an inventory item was consumed
     if (inventoryItem && inventoryItem.quantity >= data.quantity) {
-      await prisma.inventoryItem.update({
-        where: {
-          id: inventoryItem.id,
-        },
-        data: {
-          quantity: inventoryItem.quantity - data.quantity,
-          updatedAt: new Date(),
-        },
-      });
+      const newQuantity = inventoryItem.quantity - data.quantity;
+
+      if (newQuantity <= 0) {
+        // Automatically remove item when quantity reaches zero
+        await prisma.inventoryItem.update({
+          where: {
+            id: inventoryItem.id,
+          },
+          data: {
+            quantity: 0,
+            removed: true,
+            updatedAt: new Date(),
+          },
+        });
+      } else {
+        // Update quantity if still remaining
+        await prisma.inventoryItem.update({
+          where: {
+            id: inventoryItem.id,
+          },
+          data: {
+            quantity: newQuantity,
+            updatedAt: new Date(),
+          },
+        });
+      }
     } else if (inventoryItem) {
       throw new Error('Insufficient quantity in inventory to consume');
     }
@@ -552,7 +582,12 @@ export class InventoryService {
   /**
    * Get inventory trends for analytics
    */
-  async getInventoryTrends(userId: string, startDate: Date, endDate: Date, inventoryId?: string) {
+  async getInventoryTrends(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    inventoryId?: string,
+  ) {
     // First, find the application user by their Clerk ID
     const user = await prisma.user.findUnique({
       where: { clerkId: userId },
@@ -587,7 +622,15 @@ export class InventoryService {
     });
 
     // Count items by date
-    const itemsByDate: Record<string, { date: Date; totalItems: number; expiringItems: number; newlyAdded: number }> = {};
+    const itemsByDate: Record<
+      string,
+      {
+        date: Date;
+        totalItems: number;
+        expiringItems: number;
+        newlyAdded: number;
+      }
+    > = {};
 
     for (const item of itemsAdded) {
       const dateKey = item.addedAt.toISOString().split('T')[0];
@@ -631,15 +674,16 @@ export class InventoryService {
     const dateArray = Array.from(allDates).sort();
 
     const trends = await Promise.all(
-      dateArray.map(async (date) => {
+      dateArray.map(async date => {
         const dateObj = new Date(date);
         const itemsInDateRange = inventoryItems.filter(
-          item => item.addedAt <= dateObj
+          item => item.addedAt <= dateObj,
         );
 
         const totalItems = itemsInDateRange.length;
         const expiringItems = itemsInDateRange.filter(
-          item => item.expiryDate && item.expiryDate <= new Date() && !item.removed
+          item =>
+            item.expiryDate && item.expiryDate <= new Date() && !item.removed,
         ).length;
 
         return {
@@ -649,7 +693,7 @@ export class InventoryService {
           newlyAdded: itemsByDate[date]?.newlyAdded || 0,
           consumedItems: 0, // Placeholder - would need consumption logs
         };
-      })
+      }),
     );
 
     return trends;
@@ -689,7 +733,10 @@ export class InventoryService {
     });
 
     // Group by category
-    const byCategory: Record<string, { category: string; consumptionCount: number; quantityConsumed: number }> = {};
+    const byCategory: Record<
+      string,
+      { category: string; consumptionCount: number; quantityConsumed: number }
+    > = {};
     for (const log of consumptionLogs) {
       const category = log.foodItem?.category || 'Uncategorized';
       if (!byCategory[category]) {
@@ -704,7 +751,10 @@ export class InventoryService {
     }
 
     // Group by time period (daily)
-    const byTime: Record<string, { timePeriod: string; consumptionCount: number }> = {};
+    const byTime: Record<
+      string,
+      { timePeriod: string; consumptionCount: number }
+    > = {};
     for (const log of consumptionLogs) {
       const dateKey = log.consumedAt.toISOString().split('T')[0];
       if (!byTime[dateKey]) {

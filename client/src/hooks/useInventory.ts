@@ -1,5 +1,5 @@
-import { useAuth } from "@clerk/clerk-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from '@clerk/clerk-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export interface Inventory {
   id: string;
@@ -26,7 +26,8 @@ export interface InventoryItem {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Hook for authenticated API calls
 function useAuthApi() {
@@ -48,7 +49,11 @@ function useAuthApi() {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || error.message || `API request failed: ${response.status}`);
+      throw new Error(
+        error.error ||
+          error.message ||
+          `API request failed: ${response.status}`,
+      );
     }
 
     return response.json();
@@ -79,7 +84,9 @@ export function useInventory() {
     return useQuery<InventoryItem[]>({
       queryKey: ['inventory-items', inventoryId],
       queryFn: async () => {
-        const response = await fetchWithAuth(`/inventories/${inventoryId}/items`);
+        const response = await fetchWithAuth(
+          `/inventories/${inventoryId}/items`,
+        );
         // Handle response based on whether it's wrapped in 'data' property
         return response.items || [];
       },
@@ -90,7 +97,9 @@ export function useInventory() {
   // Create inventory
   const useCreateInventory = () => {
     return useMutation({
-      mutationFn: async (inventory: Omit<Inventory, 'id' | 'createdAt' | 'updatedAt'>) => {
+      mutationFn: async (
+        inventory: Omit<Inventory, 'id' | 'createdAt' | 'updatedAt'>,
+      ) => {
         const response = await fetchWithAuth('/inventories', {
           method: 'POST',
           body: JSON.stringify(inventory),
@@ -115,26 +124,37 @@ export function useInventory() {
         expiryDate?: Date;
         notes?: string;
       }) => {
-        const response = await fetchWithAuth(`/inventories/${inventoryId}/items`, {
-          method: 'POST',
-          body: JSON.stringify(item),
-        });
+        const response = await fetchWithAuth(
+          `/inventories/${inventoryId}/items`,
+          {
+            method: 'POST',
+            body: JSON.stringify(item),
+          },
+        );
         return response.data || response;
       },
-      onMutate: async (newItem) => {
+      onMutate: async newItem => {
         // Cancel any outgoing refetches
-        await queryClient.cancelQueries({ queryKey: ['inventory-items', inventoryId] });
+        await queryClient.cancelQueries({
+          queryKey: ['inventory-items', inventoryId],
+        });
 
         // Snapshot the previous value
-        const previousItems = queryClient.getQueryData(['inventory-items', inventoryId]);
+        const previousItems = queryClient.getQueryData([
+          'inventory-items',
+          inventoryId,
+        ]);
 
         // Optimistically update to the new value with a temp ID
         const tempId = `temp-${Date.now()}`;
         const optimisticItem = { ...newItem, id: tempId };
 
-        queryClient.setQueryData(['inventory-items', inventoryId], (old: InventoryItem[] | undefined) => {
-          return old ? [...old, optimisticItem] : [optimisticItem];
-        });
+        queryClient.setQueryData(
+          ['inventory-items', inventoryId],
+          (old: InventoryItem[] | undefined) => {
+            return old ? [...old, optimisticItem] : [optimisticItem];
+          },
+        );
 
         // Return a context object with the snapshotted value and temp ID
         return { previousItems, tempId };
@@ -142,15 +162,23 @@ export function useInventory() {
       onError: (_err, _newItem, context) => {
         // If the mutation fails, use the context returned from onMutate to roll back
         if (context?.previousItems) {
-          queryClient.setQueryData(['inventory-items', inventoryId], context.previousItems);
+          queryClient.setQueryData(
+            ['inventory-items', inventoryId],
+            context.previousItems,
+          );
         }
       },
       onSuccess: (realItem, _variables, context) => {
         // Replace the optimistic item with the real one from the server
-        queryClient.setQueryData(['inventory-items', inventoryId], (old: InventoryItem[] | undefined) => {
-          if (!old) return [realItem];
-          return old.map(item => item.id === context?.tempId ? realItem : item);
-        });
+        queryClient.setQueryData(
+          ['inventory-items', inventoryId],
+          (old: InventoryItem[] | undefined) => {
+            if (!old) return [realItem];
+            return old.map(item =>
+              item.id === context?.tempId ? realItem : item,
+            );
+          },
+        );
       },
     });
   };
@@ -158,7 +186,13 @@ export function useInventory() {
   // Update inventory
   const useUpdateInventory = () => {
     return useMutation({
-      mutationFn: async ({ id, data }: { id: string; data: Partial<Inventory> }) => {
+      mutationFn: async ({
+        id,
+        data,
+      }: {
+        id: string;
+        data: Partial<Inventory>;
+      }) => {
         const response = await fetchWithAuth(`/inventories/${id}`, {
           method: 'PUT',
           body: JSON.stringify(data),
@@ -174,15 +208,26 @@ export function useInventory() {
   // Update inventory item
   const useUpdateInventoryItem = (inventoryId: string) => {
     return useMutation({
-      mutationFn: async ({ id, data }: { id: string; data: Partial<InventoryItem> }) => {
-        const response = await fetchWithAuth(`/inventories/${inventoryId}/items/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify(data),
-        });
+      mutationFn: async ({
+        id,
+        data,
+      }: {
+        id: string;
+        data: Partial<InventoryItem>;
+      }) => {
+        const response = await fetchWithAuth(
+          `/inventories/${inventoryId}/items/${id}`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(data),
+          },
+        );
         return response.data || response;
       },
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory-items', inventoryId] });
+        queryClient.invalidateQueries({
+          queryKey: ['inventory-items', inventoryId],
+        });
       },
     });
   };
@@ -210,7 +255,88 @@ export function useInventory() {
         });
       },
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory-items', inventoryId] });
+        queryClient.invalidateQueries({
+          queryKey: ['inventory-items', inventoryId],
+        });
+      },
+    });
+  };
+
+  // Log consumption of an item
+  const useLogConsumption = (inventoryId: string) => {
+    return useMutation({
+      mutationFn: async (consumption: {
+        inventoryId: string;
+        inventoryItemId?: string;
+        foodItemId?: string;
+        itemName: string;
+        quantity: number;
+        unit?: string;
+        consumedAt?: Date;
+        notes?: string;
+      }) => {
+        const response = await fetchWithAuth('/inventories/consumption', {
+          method: 'POST',
+          body: JSON.stringify(consumption),
+        });
+        return response.data || response;
+      },
+      onMutate: async consumptionData => {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({
+          queryKey: ['inventory-items', inventoryId],
+        });
+
+        // Snapshot the previous value
+        const previousItems = queryClient.getQueryData([
+          'inventory-items',
+          inventoryId,
+        ]);
+
+        // Optimistically update the item quantity
+        if (consumptionData.inventoryItemId) {
+          queryClient.setQueryData(
+            ['inventory-items', inventoryId],
+            (old: InventoryItem[] | undefined) => {
+              if (!old) return old;
+              return old
+                .map(item => {
+                  if (item.id === consumptionData.inventoryItemId) {
+                    const newQuantity =
+                      item.quantity - consumptionData.quantity;
+                    return { ...item, quantity: Math.max(0, newQuantity) };
+                  }
+                  return item;
+                })
+                .filter(item => {
+                  // Remove items with zero quantity
+                  if (item.id === consumptionData.inventoryItemId) {
+                    const newQuantity =
+                      item.quantity - consumptionData.quantity;
+                    return newQuantity > 0;
+                  }
+                  return true;
+                });
+            },
+          );
+        }
+
+        return { previousItems };
+      },
+      onError: (_err, _consumptionData, context) => {
+        // If the mutation fails, use the context to roll back
+        if (context?.previousItems) {
+          queryClient.setQueryData(
+            ['inventory-items', inventoryId],
+            context.previousItems,
+          );
+        }
+      },
+      onSuccess: () => {
+        // Refresh inventory items to ensure consistency with server
+        queryClient.invalidateQueries({
+          queryKey: ['inventory-items', inventoryId],
+        });
       },
     });
   };
@@ -224,5 +350,6 @@ export function useInventory() {
     useUpdateInventoryItem,
     useDeleteInventory,
     useRemoveItemFromInventory,
+    useLogConsumption,
   };
 }
