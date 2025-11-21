@@ -258,6 +258,8 @@ export default function InventoryDetailPage() {
       setSelectedItem(null);
     } catch (error) {
       console.error('Error logging consumption:', error);
+      // Show user-friendly error message
+      alert('Failed to log consumption. Please try again.');
     }
   };
 
@@ -709,15 +711,24 @@ export default function InventoryDetailPage() {
                   {/* Consumption Button */}
                   <button
                     onClick={() => handleConsumption(item)}
-                    disabled={item.quantity <= 0}
+                    disabled={item.quantity <= 0 || item.id.startsWith('temp-')}
                     className={`w-full px-3 py-2 rounded-lg transition-smooth font-medium flex items-center justify-center gap-2 ${
-                      item.quantity <= 0
+                      item.quantity <= 0 || item.id.startsWith('temp-')
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-primary text-primary-foreground hover:bg-primary/90'
                     }`}
+                    title={
+                      item.id.startsWith('temp-')
+                        ? 'Item is being saved, please wait...'
+                        : undefined
+                    }
                   >
                     <Utensils className="w-4 h-4" />
-                    {item.quantity <= 0 ? 'Out of Stock' : 'Consume'}
+                    {item.quantity <= 0
+                      ? 'Out of Stock'
+                      : item.id.startsWith('temp-')
+                      ? 'Saving...'
+                      : 'Consume'}
                   </button>
                 </div>
               );
