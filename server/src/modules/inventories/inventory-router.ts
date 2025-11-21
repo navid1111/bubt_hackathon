@@ -1,5 +1,6 @@
 import express from 'express';
 import { ensureUserExists, requireAuth } from '../../middleware/auth';
+import { fileUploadMiddleware } from '../../middleware/fileUpload';
 import { inventoryController } from './inventory-controller';
 
 const router = express.Router();
@@ -32,6 +33,11 @@ router.delete('/:inventoryId', inventoryController.deleteInventory);
 // Inventory items routes
 router.get('/:inventoryId/items', inventoryController.getInventoryItems);
 router.post('/:inventoryId/items', inventoryController.addInventoryItem);
+router.post(
+  '/:inventoryId/items/from-image',
+  fileUploadMiddleware,
+  inventoryController.addItemsFromImage,
+); // New OCR route
 router.put(
   '/:inventoryId/items/:itemId',
   inventoryController.updateInventoryItem,

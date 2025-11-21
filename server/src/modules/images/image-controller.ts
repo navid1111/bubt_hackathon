@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { imageService } from './image-service';
 import { UploadedFile } from 'express-fileupload';
+import { imageService } from './image-service';
 
 export class ImageController {
   async uploadImage(req: Request, res: Response) {
@@ -68,7 +68,7 @@ export class ImageController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const images = await imageService.getUserImages(userId);
+      const images = await imageService.getImagesByUser(userId);
 
       res.json({
         success: true,

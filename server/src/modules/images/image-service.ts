@@ -1,6 +1,10 @@
-import prisma from '../../config/database';
-import { uploadToCloudinary, deleteFromCloudinary } from '../../utils/uploadImage';
 import { UploadedFile } from 'express-fileupload';
+import prisma from '../../config/database';
+import { ocrService } from '../../services/ocr-service';
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from '../../utils/uploadImage';
 
 export class ImageService {
   async uploadImage(
@@ -10,13 +14,20 @@ export class ImageService {
       inventoryId?: string;
       inventoryItemId?: string;
       foodItemId?: string;
-    }
+    },
   ) {
     try {
       // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/jpg',
+        'image/webp',
+      ];
       if (!allowedTypes.includes(file.mimetype)) {
-        throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.');
+        throw new Error(
+          'Invalid file type. Only JPEG, PNG, and WebP are allowed.',
+        );
       }
 
       // Upload to Cloudinary
@@ -25,7 +36,7 @@ export class ImageService {
       // Get the database user ID from Clerk ID
       const user = await prisma.user.findUnique({
         where: { clerkId: clerkUserId },
-        select: { id: true }
+        select: { id: true },
       });
 
       if (!user) {
@@ -58,7 +69,7 @@ export class ImageService {
       // Get the database user ID from Clerk ID
       const user = await prisma.user.findUnique({
         where: { clerkId: clerkUserId },
-        select: { id: true }
+        select: { id: true },
       });
 
       if (!user) {
@@ -73,7 +84,8 @@ export class ImageService {
         throw new Error('File not found');
       }
 
-      if (file.userId !== user.id) { // Compare with database ID
+      if (file.userId !== user.id) {
+        // Compare with database ID
         throw new Error('Unauthorized to delete this file');
       }
 
@@ -96,26 +108,67 @@ export class ImageService {
     }
   }
 
-  async getUserImages(clerkUserId: string) {
-    // Get the database user ID from Clerk ID
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerkUserId },
-      select: { id: true }
-    });
+  async uploadImageWithOCR(
+    file: UploadedFile,
+    clerkUserId: string,
+    metadata?: {
+      inventoryId?: string;
+      inventoryItemId?: string;
+      foodItemId?: string;
+      extractItems?: boolean; // Flag to enable/disable OCR
+    },
+  ) {
+    try {
+      // Upload image first
+      const savedFile = await this.uploadImage(file, clerkUserId, metadata);
 
-    if (!user) {
-      throw new Error('User not found in database');
+      // If OCR is requested, extract text and items
+      if (metadata?.extractItems) {
+        console.log('🔍 [ImageService] Starting OCR extraction...');
+        const ocrResult = await ocrService.extractTextFromImage(savedFile.url);
+
+        return {
+          file: savedFile,
+          ocr: {
+            text: ocrResult.text,
+            confidence: ocrResult.confidence,
+            extractedItems: ocrResult.extractedItems,
+          },
+        };
+      }
+
+      return { file: savedFile };
+    } catch (error) {
+      console.error('Error uploading image with OCR:', error);
+      throw error;
     }
+  }
 
-    return prisma.file.findMany({
-      where: {
-        userId: user.id, // Use database ID
-        isDeleted: false,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+  async getImagesByUser(clerkUserId: string) {
+    try {
+      // Get the database user ID from Clerk ID
+      const user = await prisma.user.findUnique({
+        where: { clerkId: clerkUserId },
+        select: { id: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found in database');
+      }
+
+      return prisma.file.findMany({
+        where: {
+          userId: user.id, // Use database ID
+          isDeleted: false,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    } catch (error) {
+      console.error('Error getting user images:', error);
+      throw error;
+    }
   }
 }
 
