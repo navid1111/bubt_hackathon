@@ -7,6 +7,7 @@ import { intelligenceRouter } from './modules/intelligence/intelligence-router';
 import { inventoryRouter } from './modules/inventories/inventory-router';
 import { resourcesRouter } from './modules/resources/resources-router';
 import { usersRouter } from './modules/users/users-router';
+import { sharingRouter } from './modules/sharing/sharing-router';
 const router = express.Router();
 
 router.get('/', (req: Request, res: Response) => {
@@ -31,6 +32,7 @@ router.use('/resources', resourcesRouter);
 router.use('/users', usersRouter);
 router.use('/inventories', inventoryRouter);
 router.use('/images', imageRouter);
+router.use('/sharing', sharingRouter);
 
 // AI Intelligence routes (require authentication)
 router.use('/intelligence', intelligenceRouter);
