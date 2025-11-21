@@ -1,18 +1,22 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  AlertCircle,
-  Apple,
   ArrowLeft,
-  Calendar,
-  Filter,
   Package,
   Plus,
-  ShoppingCart,
-  Utensils,
+  Search,
+  AlertCircle,
+  Filter,
   X,
+  Apple,
+  Calendar,
+  Hash,
+  FileText,
+  Trash2,
+  Camera,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../hooks/useInventory';
+import ImageUploadModal from '../components/inventory/ImageUploadModal';
 
 export interface Inventory {
   id: string;
@@ -53,6 +57,10 @@ export interface FoodItem {
 }
 
 export default function InventoryDetailPage() {
+  // Image upload modal state
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+
+  // Rest of the states
   const { inventoryId } = useParams<{ inventoryId: string }>();
   const navigate = useNavigate();
   const [inventory, setInventory] = useState<Inventory | null>(null);
@@ -88,11 +96,9 @@ export default function InventoryDetailPage() {
       return;
     }
 
-    // Wait for inventories to load
     if (isLoading) return;
 
     try {
-      // Find the specific inventory from the list of all inventories
       if (inventories) {
         const foundInventory = inventories.find(inv => inv.id === inventoryId);
         if (foundInventory) {
@@ -112,6 +118,14 @@ export default function InventoryDetailPage() {
       setLoading(false);
     }
   }, [inventoryId, inventories, isLoading]);
+
+  // Handle image upload success
+  const handleImageUploadSuccess = (extractedItems: any[]) => {
+    console.log('Extracted items:', extractedItems);
+    // TODO: Show review modal with extracted items
+    setShowImageUploadModal(false);
+    // For now, you can show the AddItemModal or create a ReviewExtractedItemsModal
+  };
 
   if (isLoading || loading) {
     return (
@@ -172,16 +186,13 @@ export default function InventoryDetailPage() {
     const itemCategory =
       item.foodItem?.category || (item.foodItemId ? 'uncategorized' : 'custom');
 
-    // Text search filter
     const matchesSearch =
       itemName.toLowerCase().includes(search.toLowerCase()) ||
       itemNotes.toLowerCase().includes(search.toLowerCase());
 
-    // Category filter
     const matchesCategory =
       !filters.category || itemCategory === filters.category;
 
-    // Expiry status filter
     let matchesExpiry = true;
     if (filters.expiryStatus) {
       const today = new Date();
@@ -208,7 +219,6 @@ export default function InventoryDetailPage() {
       }
     }
 
-    // Stock level filter
     let matchesStock = true;
     if (filters.stockLevel) {
       switch (filters.stockLevel) {
@@ -275,7 +285,6 @@ export default function InventoryDetailPage() {
   const hasActiveFilters =
     filters.category || filters.expiryStatus || filters.stockLevel || search;
 
-  // Get unique categories from inventory items
   const availableCategories = Array.from(
     new Set(
       (inventoryItems || [])
@@ -295,29 +304,26 @@ export default function InventoryDetailPage() {
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
           <button
             onClick={() => navigate('/inventory')}
-            className="p-2 rounded-lg hover:bg-secondary/20 transition-colors"
+            className="p-2 hover:bg-secondary/20 rounded-lg transition-smooth"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft className="w-5 h-5 text-foreground/70" />
           </button>
-          <div className="flex-1">
-            <h1 className="font-bold text-lg text-foreground">
-              {inventory.name}
-            </h1>
-            <p className="text-sm text-foreground/70">
-              {inventory.description || 'Manage your food items'}
-            </p>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Package className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg text-foreground">{inventory.name}</h1>
+              {inventory.description && (
+                <p className="text-sm text-foreground/70">{inventory.description}</p>
+              )}
+            </div>
           </div>
-          <button
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium flex items-center gap-2"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus className="w-4 h-4" /> Add Item
-          </button>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Stats Section */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center gap-3">
@@ -327,7 +333,7 @@ export default function InventoryDetailPage() {
               <div>
                 <p className="text-sm text-foreground/70">Total Items</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {(inventoryItems || []).length}
+                  {inventoryItems?.length || 0}
                 </p>
               </div>
             </div>
@@ -339,14 +345,9 @@ export default function InventoryDetailPage() {
                 <Apple className="w-5 h-5 text-accent" />
               </div>
               <div>
-                <p className="text-sm text-foreground/70">Fruits & Veggies</p>
+                <p className="text-sm text-foreground/70">Categories</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {
-                    (inventoryItems || []).filter(i => {
-                      const category = i.foodItem?.category;
-                      return ['fruit', 'vegetable'].includes(category || '');
-                    }).length
-                  }
+                  {availableCategories.length}
                 </p>
               </div>
             </div>
@@ -354,23 +355,22 @@ export default function InventoryDetailPage() {
 
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-secondary/20 rounded-lg flex items-center justify-center">
-                <Utensils className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-red-600" />
               </div>
               <div>
                 <p className="text-sm text-foreground/70">Expiring Soon</p>
                 <p className="text-2xl font-bold text-foreground">
                   {
-                    (inventoryItems || []).filter(i => {
-                      if (!i.expiryDate) return false;
-                      const expDate = new Date(i.expiryDate);
+                    inventoryItems?.filter(item => {
+                      if (!item.expiryDate) return false;
+                      const expDate = new Date(item.expiryDate);
                       const today = new Date();
-                      const diffTime = expDate.getTime() - today.getTime();
                       const diffDays = Math.ceil(
-                        diffTime / (1000 * 60 * 60 * 24),
+                        (expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
                       );
-                      return diffDays <= 3 && diffDays >= 0;
-                    }).length
+                      return diffDays >= 0 && diffDays <= 3;
+                    }).length || 0
                   }
                 </p>
               </div>
@@ -378,67 +378,58 @@ export default function InventoryDetailPage() {
           </div>
         </div>
 
-        {/* Search and Filter Section */}
+        {/* Quick Actions Bar */}
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex-1 px-4 py-3 bg-card border-2 border-dashed border-primary/30 
+                       rounded-lg hover:border-primary hover:bg-primary/5 transition-smooth
+                       flex items-center justify-center gap-2"
+          >
+            <Plus className="w-5 h-5 text-primary" />
+            <span className="font-medium text-primary">Add Manually</span>
+          </button>
+          
+          <button
+            onClick={() => setShowImageUploadModal(true)}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-primary to-primary/80 
+                       text-primary-foreground rounded-lg hover:shadow-lg 
+                       transition-smooth flex items-center justify-center gap-2"
+          >
+            <Camera className="w-5 h-5" />
+            <span className="font-medium">Scan Receipt</span>
+          </button>
+        </div>
+
+        {/* Search and Filter */}
         <div className="mb-6 space-y-4">
-          {/* Search Bar and Filter Toggle */}
           <div className="flex gap-3">
             <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
               <input
                 type="text"
-                placeholder="Search items in this inventory..."
+                placeholder="Search items..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground pr-10"
+                className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-foreground"
               />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-foreground/40 hover:text-foreground"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 border border-border rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-smooth ${
                 showFilters || hasActiveFilters
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-foreground hover:bg-secondary/10'
+                  : 'bg-card border border-border text-foreground hover:bg-secondary/10'
               }`}
             >
               <Filter className="w-4 h-4" />
               Filters
-              {hasActiveFilters && (
-                <span className="bg-primary-foreground text-primary rounded-full w-5 h-5 text-xs flex items-center justify-center font-semibold">
-                  {
-                    [
-                      filters.category,
-                      filters.expiryStatus,
-                      filters.stockLevel,
-                      search,
-                    ].filter(Boolean).length
-                  }
-                </span>
-              )}
             </button>
           </div>
 
           {/* Filter Panel */}
           {showFilters && (
             <div className="bg-card border border-border rounded-lg p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-foreground">Filter Items</h3>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearFilters}
-                    className="text-sm text-primary hover:text-primary/80 transition-colors"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Category Filter */}
                 <div>
@@ -448,17 +439,14 @@ export default function InventoryDetailPage() {
                   <select
                     value={filters.category}
                     onChange={e =>
-                      setFilters(prev => ({
-                        ...prev,
-                        category: e.target.value,
-                      }))
+                      setFilters(prev => ({ ...prev, category: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
                   >
                     <option value="">All Categories</option>
-                    {availableCategories.map(category => (
-                      <option key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                    {availableCategories.map(cat => (
+                      <option key={cat} value={cat}>
+                        {cat}
                       </option>
                     ))}
                   </select>
@@ -472,19 +460,14 @@ export default function InventoryDetailPage() {
                   <select
                     value={filters.expiryStatus}
                     onChange={e =>
-                      setFilters(prev => ({
-                        ...prev,
-                        expiryStatus: e.target.value,
-                      }))
+                      setFilters(prev => ({ ...prev, expiryStatus: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
                   >
-                    <option value="">All Items</option>
+                    <option value="">All Status</option>
                     <option value="expired">Expired</option>
-                    <option value="expiring-soon">
-                      Expiring Soon ({'≤'}3 days)
-                    </option>
-                    <option value="fresh">Fresh ({'>'}3 days)</option>
+                    <option value="expiring-soon">Expiring Soon (≤3 days)</option>
+                    <option value="fresh">Fresh (&gt;3 days)</option>
                     <option value="no-expiry">No Expiry Date</option>
                   </select>
                 </div>
@@ -497,213 +480,128 @@ export default function InventoryDetailPage() {
                   <select
                     value={filters.stockLevel}
                     onChange={e =>
-                      setFilters(prev => ({
-                        ...prev,
-                        stockLevel: e.target.value,
-                      }))
+                      setFilters(prev => ({ ...prev, stockLevel: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
                   >
-                    <option value="">All Stock Levels</option>
+                    <option value="">All Levels</option>
                     <option value="out-of-stock">Out of Stock</option>
-                    <option value="low-stock">Low Stock ({'≤'}2)</option>
-                    <option value="in-stock">In Stock ({'>'}2)</option>
+                    <option value="low-stock">Low Stock (≤2)</option>
+                    <option value="in-stock">In Stock (&gt;2)</option>
                   </select>
                 </div>
               </div>
 
-              {/* Active Filter Tags */}
               {hasActiveFilters && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                  <span className="text-sm text-foreground/70">
-                    Active filters:
-                  </span>
-                  {search && (
-                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
-                      Search: "{search}"
-                      <button
-                        onClick={() => setSearch('')}
-                        className="hover:bg-primary/20 rounded-full p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filters.category && (
-                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
-                      {filters.category.charAt(0).toUpperCase() +
-                        filters.category.slice(1)}
-                      <button
-                        onClick={() =>
-                          setFilters(prev => ({ ...prev, category: '' }))
-                        }
-                        className="hover:bg-primary/20 rounded-full p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filters.expiryStatus && (
-                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
-                      {filters.expiryStatus
-                        .split('-')
-                        .map(
-                          word => word.charAt(0).toUpperCase() + word.slice(1),
-                        )
-                        .join(' ')}
-                      <button
-                        onClick={() =>
-                          setFilters(prev => ({ ...prev, expiryStatus: '' }))
-                        }
-                        className="hover:bg-primary/20 rounded-full p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filters.stockLevel && (
-                    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs flex items-center gap-1">
-                      {filters.stockLevel
-                        .split('-')
-                        .map(
-                          word => word.charAt(0).toUpperCase() + word.slice(1),
-                        )
-                        .join(' ')}
-                      <button
-                        onClick={() =>
-                          setFilters(prev => ({ ...prev, stockLevel: '' }))
-                        }
-                        className="hover:bg-primary/20 rounded-full p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                </div>
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-primary hover:text-primary/80 flex items-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Clear Filters
+                </button>
               )}
             </div>
           )}
         </div>
 
+        {/* Items List */}
         {itemsLoading ? (
-          <div className="text-center py-12 text-foreground/60">
-            Loading items...
+          <div className="text-center py-12">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-foreground/70">Loading items...</p>
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 bg-card rounded-xl border border-border">
             <Package className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">
-              {hasActiveFilters
-                ? 'No items match your filters'
-                : 'No items yet'}
+              {hasActiveFilters ? 'No items match your filters' : 'No items yet'}
             </h3>
             <p className="text-foreground/60 mb-4">
               {hasActiveFilters
-                ? 'Try adjusting your search or filter criteria'
-                : 'Add food items to this inventory'}
+                ? 'Try adjusting your search or filters'
+                : 'Add your first item to get started'}
             </p>
-            {hasActiveFilters ? (
+            {!hasActiveFilters && (
               <button
-                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-smooth font-medium mr-2"
-                onClick={clearFilters}
+                onClick={() => setShowAddModal(true)}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth"
               >
-                Clear Filters
+                Add Item
               </button>
-            ) : null}
-            <button
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium"
-              onClick={() => setShowAddModal(true)}
-            >
-              Add Item
-            </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredItems.map(item => {
-              const itemName =
-                item.customName || item.foodItem?.name || 'Unknown Item';
-              const itemCategory =
-                item.foodItem?.category ||
-                (item.foodItemId ? 'uncategorized' : 'custom');
+              const itemName = item.customName || item.foodItem?.name || 'Unknown Item';
+              const category = item.foodItem?.category || 'custom';
+              const expiryDate = item.expiryDate ? new Date(item.expiryDate) : null;
+              const today = new Date();
+              const daysUntilExpiry = expiryDate
+                ? Math.ceil(
+                    (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                  )
+                : null;
+
+              let expiryStatus = 'none';
+              let expiryColor = 'text-foreground/60';
+              if (daysUntilExpiry !== null) {
+                if (daysUntilExpiry < 0) {
+                  expiryStatus = 'expired';
+                  expiryColor = 'text-red-600';
+                } else if (daysUntilExpiry <= 3) {
+                  expiryStatus = 'expiring-soon';
+                  expiryColor = 'text-orange-600';
+                } else {
+                  expiryStatus = 'fresh';
+                  expiryColor = 'text-green-600';
+                }
+              }
 
               return (
                 <div
                   key={item.id}
-                  className="bg-card rounded-xl border border-border p-6 shadow hover:shadow-lg transition-smooth"
+                  className="bg-card rounded-xl border border-border p-4 hover:shadow-lg transition-smooth"
                 >
-                  <div className="flex items-center gap-3 mb-2">
-                    {itemCategory === 'fruit' && (
-                      <Apple className="w-6 h-6 text-primary" />
-                    )}
-                    {itemCategory === 'vegetable' && (
-                      <ShoppingCart className="w-6 h-6 text-primary" />
-                    )}
-                    {itemCategory === 'dairy' && (
-                      <Utensils className="w-6 h-6 text-primary" />
-                    )}
-                    {itemCategory === 'grain' && (
-                      <Package className="w-6 h-6 text-primary" />
-                    )}
-                    {itemCategory === 'protein' && (
-                      <Package className="w-6 h-6 text-primary" />
-                    )}
-                    {itemCategory === 'pantry' && (
-                      <Package className="w-6 h-6 text-primary" />
-                    )}
-                    {itemCategory === 'custom' && (
-                      <AlertCircle className="w-6 h-6 text-orange-500" />
-                    )}
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <span className="font-bold text-lg text-foreground">
-                        {itemName}
+                      <h3 className="font-semibold text-foreground mb-1">{itemName}</h3>
+                      <p className="text-sm text-foreground/70 capitalize">{category}</p>
+                    </div>
+                    <button
+                      onClick={() => handleConsumption(item)}
+                      className="text-foreground/60 hover:text-red-600 transition-smooth"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Hash className="w-4 h-4 text-foreground/40" />
+                      <span className="text-foreground">
+                        Quantity: {item.quantity} {item.unit || 'units'}
                       </span>
-                      {item.foodItem && (
-                        <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                          Linked
-                        </span>
-                      )}
-                      {!item.foodItem && item.customName && (
-                        <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-                          Custom
-                        </span>
-                      )}
                     </div>
-                  </div>
 
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-foreground font-semibold">
-                        {item.quantity} {item.unit}
-                      </div>
-                      {item.quantity <= 2 && item.quantity > 0 && (
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                          Low Stock
-                        </span>
-                      )}
-                      {item.quantity === 0 && (
-                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
-                          Out of Stock
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-foreground/70 capitalize">
-                      {itemCategory}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-sm mb-4">
-                    {item.expiryDate && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-foreground/70" />
-                        <span className="text-foreground/70">
-                          Expires:{' '}
-                          {new Date(item.expiryDate).toLocaleDateString()}
+                    {expiryDate && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-4 h-4 text-foreground/40" />
+                        <span className={expiryColor}>
+                          {expiryStatus === 'expired'
+                            ? `Expired ${Math.abs(daysUntilExpiry!)} days ago`
+                            : expiryStatus === 'expiring-soon'
+                            ? `Expires in ${daysUntilExpiry} days`
+                            : `Expires ${expiryDate.toLocaleDateString()}`}
                         </span>
                       </div>
                     )}
+
                     {item.notes && (
-                      <div className="text-foreground/70">
-                        <span className="font-medium">Notes:</span> {item.notes}
+                      <div className="flex items-start gap-2 text-sm">
+                        <FileText className="w-4 h-4 text-foreground/40 mt-0.5" />
+                        <span className="text-foreground/70 text-xs">{item.notes}</span>
                       </div>
                     )}
                   </div>
@@ -756,10 +654,20 @@ export default function InventoryDetailPage() {
           onAdd={addItemMutation.mutate}
         />
       )}
+
+      {/* Image Upload Modal */}
+      {showImageUploadModal && (
+        <ImageUploadModal
+          inventoryId={inventoryId!}
+          onClose={() => setShowImageUploadModal(false)}
+          onSuccess={handleImageUploadSuccess}
+        />
+      )}
     </div>
   );
 }
 
+// ConsumptionModal Component
 interface ConsumptionModalProps {
   item: InventoryItem;
   onClose: () => void;
@@ -833,126 +741,129 @@ function ConsumptionModal({ item, onClose, onConsume }: ConsumptionModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-background/60 backdrop-blur-md flex items-center justify-center z-50">
-      <form
-        className="bg-card rounded-2xl border border-border shadow-xl p-8 w-full max-w-md"
-        onSubmit={handleSubmit}
-      >
-        <h2 className="text-xl font-bold text-foreground mb-4">Consume Item</h2>
-
-        <div className="bg-secondary/10 rounded-lg p-4 mb-4">
-          <h3 className="font-semibold text-foreground">{itemName}</h3>
-          <p className="text-sm text-foreground/70">
-            Available: {maxQuantity} {item.unit}
-          </p>
-          {form.quantity > 0 && (
-            <div className="mt-2 text-sm">
-              <p className="text-foreground/80">
-                After consumption:{' '}
-                <span
-                  className={`font-semibold ${
-                    willBeRemoved ? 'text-orange-600' : 'text-green-600'
-                  }`}
-                >
-                  {remainingAfterConsumption} {item.unit}
-                </span>
-              </p>
-              {willBeRemoved && (
-                <p className="text-orange-600 font-medium mt-1">
-                  ⚠️ This item will be removed from inventory
-                </p>
-              )}
-            </div>
-          )}
+    <div className="fixed inset-0 bg-background/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-md">
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <h2 className="text-xl font-bold text-foreground">Log Consumption</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-secondary/20 rounded-lg transition-smooth"
+          >
+            <X className="w-5 h-5 text-foreground/70" />
+          </button>
         </div>
 
-        {error && (
-          <div className="text-red-500 mb-4 p-2 bg-red-50 rounded-lg flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-foreground">
-                Quantity *
-              </label>
+            <p className="text-sm text-foreground/70 mb-1">Item</p>
+            <p className="font-medium text-foreground">{itemName}</p>
+            <p className="text-sm text-foreground/60">
+              Available: {maxQuantity} {item.unit || 'units'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Quantity Consumed
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                name="quantity"
+                value={form.quantity}
+                onChange={handleChange}
+                min="0"
+                max={maxQuantity}
+                step="0.01"
+                className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+                required
+              />
               <button
                 type="button"
                 onClick={handleConsumeAll}
-                className="text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
+                className="px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-smooth text-sm font-medium"
               >
-                Use All ({maxQuantity})
+                All
               </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                name="quantity"
-                type="number"
-                min="0.1"
-                max={maxQuantity}
-                step="0.1"
-                required
-                value={form.quantity}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-              />
-              <input
-                name="unit"
-                placeholder="kg, L, pcs"
-                value={form.unit}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-              />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Unit (optional)
+            </label>
+            <input
+              type="text"
+              name="unit"
+              value={form.unit}
+              onChange={handleChange}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+              placeholder={item.unit || 'e.g., kg, liters, pieces'}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
               Notes (optional)
             </label>
             <textarea
               name="notes"
-              placeholder="Add any notes about consumption..."
               value={form.notes}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
               rows={3}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground resize-none"
+              placeholder="Add any notes..."
             />
           </div>
-        </div>
 
-        <div className="flex gap-2 mt-6">
-          <button
-            type="submit"
-            disabled={loading}
-            className={`px-4 py-2 rounded-lg transition-smooth font-medium flex-1 ${
-              willBeRemoved
-                ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-            }`}
-          >
-            {loading
-              ? 'Consuming...'
-              : willBeRemoved
-              ? 'Consume & Remove'
-              : 'Consume'}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-secondary/10 transition-smooth font-medium flex-1"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+          {remainingAfterConsumption > 0 && (
+            <div className="p-3 bg-primary/5 rounded-lg">
+              <p className="text-sm text-foreground/70">
+                Remaining after consumption:{' '}
+                <span className="font-medium text-foreground">
+                  {remainingAfterConsumption} {item.unit || 'units'}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {willBeRemoved && (
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-orange-600">
+                ⚠️ This will remove the item from your inventory
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-smooth font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium disabled:opacity-50"
+            >
+              {loading ? 'Logging...' : 'Log Consumption'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
+// AddItemModal Component
 interface AddItemModalProps {
   onClose: () => void;
   onAdd: (item: {
@@ -972,8 +883,6 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
     quantity: 0,
     unit: '',
     expirationDate: '',
-    purchaseDate: '',
-    location: '',
     notes: '',
     useCustomItem: false,
   });
@@ -982,19 +891,15 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
   const [error, setError] = useState('');
   const [loadingFoodItems, setLoadingFoodItems] = useState(true);
 
-  // Fetch food items from the API
   useEffect(() => {
     const fetchFoodItems = async () => {
       try {
-        const response = await fetch('/api/foods');
-        if (response.ok) {
-          const data = await response.json();
-          setFoodItems(data.data || []);
-        } else {
-          console.error('Failed to fetch food items');
-        }
-      } catch (error) {
-        console.error('Error fetching food items:', error);
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const response = await fetch(`${API_URL}/foods`);
+        const data = await response.json();
+        setFoodItems(data.data || []);
+      } catch (err) {
+        console.error('Error fetching food items:', err);
       } finally {
         setLoadingFoodItems(false);
       }
@@ -1011,34 +916,22 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
     const { name, value, type } = e.target;
 
     if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
       setForm(prev => ({
         ...prev,
-        [name]: checked,
+        [name]: (e.target as HTMLInputElement).checked,
+        selectedFoodItemId: '',
+        customName: '',
       }));
     } else {
-      setForm(prev => ({
-        ...prev,
-        [name]: name === 'quantity' ? Number(value) : value,
-      }));
+      setForm(prev => ({ ...prev, [name]: value }));
     }
 
-    // Auto-fill unit when food item is selected
     if (name === 'selectedFoodItemId' && value) {
-      const selectedFood = foodItems.find(item => item.id === value);
-      if (selectedFood) {
+      const selectedItem = foodItems.find(item => item.id === value);
+      if (selectedItem) {
         setForm(prev => ({
           ...prev,
-          unit: selectedFood.unit || '',
-          // Auto-calculate expiry date if typical expiration days is available
-          expirationDate: selectedFood.typicalExpirationDays
-            ? new Date(
-                Date.now() +
-                  selectedFood.typicalExpirationDays * 24 * 60 * 60 * 1000,
-              )
-                .toISOString()
-                .split('T')[0]
-            : prev.expirationDate,
+          unit: selectedItem.unit || prev.unit,
         }));
       }
     }
@@ -1050,23 +943,35 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
     setError('');
 
     try {
-      const itemData = {
-        foodItemId: form.useCustomItem
-          ? undefined
-          : form.selectedFoodItemId || undefined,
-        customName: form.useCustomItem ? form.customName : undefined,
-        quantity: form.quantity,
+      const itemData: any = {
+        quantity: Number(form.quantity),
         unit: form.unit,
-        expiryDate: form.expirationDate
-          ? new Date(form.expirationDate)
-          : undefined,
         notes: form.notes || undefined,
       };
+
+      if (form.expirationDate) {
+        itemData.expiryDate = new Date(form.expirationDate);
+      }
+
+      if (form.useCustomItem) {
+        if (!form.customName.trim()) {
+          setError('Custom item name is required');
+          setLoading(false);
+          return;
+        }
+        itemData.customName = form.customName;
+      } else {
+        if (!form.selectedFoodItemId) {
+          setError('Please select a food item');
+          setLoading(false);
+          return;
+        }
+        itemData.foodItemId = form.selectedFoodItemId;
+      }
 
       await onAdd(itemData);
       onClose();
     } catch (err) {
-      console.error('Error adding item:', err);
       setError('Failed to add item');
     } finally {
       setLoading(false);
@@ -1074,24 +979,19 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-background/60 backdrop-blur-md flex items-center justify-center z-50">
-      <form
-        className="bg-card rounded-2xl border border-border shadow-xl p-8 w-full max-w-md"
-        onSubmit={handleSubmit}
-      >
-        <h2 className="text-xl font-bold text-foreground mb-4">
-          Add Item to Inventory
-        </h2>
+    <div className="fixed inset-0 bg-background/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-foreground">Add Item to Inventory</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-secondary/20 rounded-lg transition-smooth"
+          >
+            <X className="w-5 h-5 text-foreground/70" />
+          </button>
+        </div>
 
-        {error && (
-          <div className="text-red-500 mb-4 p-2 bg-red-50 rounded-lg flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-3">
-          {/* Toggle between existing food items and custom items */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -1099,137 +999,137 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
               name="useCustomItem"
               checked={form.useCustomItem}
               onChange={handleChange}
-              className="rounded"
+              className="w-4 h-4 text-primary border-border rounded focus:ring-2 focus:ring-primary"
             />
-            <label htmlFor="useCustomItem" className="text-sm text-foreground">
+            <label htmlFor="useCustomItem" className="text-sm font-medium text-foreground">
               Add custom item (not in database)
             </label>
           </div>
 
-          {!form.useCustomItem ? (
-            // Select from existing food items
+          {form.useCustomItem ? (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Select Food Item
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Item Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="customName"
+                value={form.customName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+                placeholder="Enter item name"
+                required
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Select Food Item <span className="text-red-500">*</span>
               </label>
               {loadingFoodItems ? (
-                <div className="text-sm text-foreground/60">
-                  Loading food items...
-                </div>
+                <p className="text-sm text-foreground/60">Loading food items...</p>
               ) : (
                 <select
                   name="selectedFoodItemId"
                   value={form.selectedFoodItemId}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-                  required={!form.useCustomItem}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+                  required
                 >
-                  <option value="">Select a food item...</option>
+                  <option value="">Select an item</option>
                   {foodItems.map(item => (
                     <option key={item.id} value={item.id}>
-                      {item.name} ({item.category}) - {item.unit}
+                      {item.name} {item.category && `(${item.category})`}
                     </option>
                   ))}
                 </select>
               )}
             </div>
-          ) : (
-            // Custom item name
-            <input
-              name="customName"
-              required={form.useCustomItem}
-              placeholder="Custom item name"
-              value={form.customName}
-              onChange={handleChange}
-              className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-            />
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              name="quantity"
-              type="number"
-              min="0"
-              required
-              placeholder="Quantity"
-              value={form.quantity}
-              onChange={handleChange}
-              className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-            />
-
-            <input
-              name="unit"
-              required
-              placeholder="Unit (kg, L, pcs)"
-              value={form.unit}
-              onChange={handleChange}
-              className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-foreground/70 mb-1">
-                Expiration Date
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Quantity <span className="text-red-500">*</span>
               </label>
               <input
-                name="expirationDate"
-                type="date"
-                value={form.expirationDate || ''}
+                type="number"
+                name="quantity"
+                value={form.quantity}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+                required
               />
             </div>
 
             <div>
-              <label className="block text-xs text-foreground/70 mb-1">
-                Purchase Date
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Unit
               </label>
               <input
-                name="purchaseDate"
-                type="date"
-                value={form.purchaseDate || ''}
+                type="text"
+                name="unit"
+                value={form.unit}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+                placeholder="e.g., kg, liters, pieces"
               />
             </div>
           </div>
 
-          <input
-            name="location"
-            placeholder="Storage location (e.g., Fridge, Pantry)"
-            value={form.location}
-            onChange={handleChange}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-          />
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Expiration Date (optional)
+            </label>
+            <input
+              type="date"
+              name="expirationDate"
+              value={form.expirationDate}
+              onChange={handleChange}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
+            />
+          </div>
 
-          <textarea
-            name="notes"
-            placeholder="Additional notes"
-            value={form.notes}
-            onChange={handleChange}
-            className="px-3 py-2 border border-border rounded-lg bg-background text-foreground"
-            rows={2}
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Notes (optional)
+            </label>
+            <textarea
+              name="notes"
+              value={form.notes}
+              onChange={handleChange}
+              rows={3}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground resize-none"
+              placeholder="Add any additional notes..."
+            />
+          </div>
 
-        <div className="flex gap-2 mt-6">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium flex-1"
-          >
-            {loading ? 'Adding...' : 'Add Item'}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-secondary/10 transition-smooth font-medium flex-1"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-smooth font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || loadingFoodItems}
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-smooth font-medium disabled:opacity-50"
+            >
+              {loading ? 'Adding...' : 'Add Item'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

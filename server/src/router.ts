@@ -4,6 +4,7 @@ import { resourcesRouter } from './modules/resources/resources-router';
 import { usersRouter } from './modules/users/users-router';
 import { foodRouter } from './modules/foods/food-router';
 import { inventoryRouter } from './modules/inventories/inventory-router';
+import { imageRouter } from './modules/images/image-router';
 const router = express.Router();
 
 router.get('/', (req: Request, res: Response) => {
@@ -27,5 +28,6 @@ router.use('/resources', resourcesRouter);
 // Protected routes (require authentication)
 router.use('/users', usersRouter);
 router.use('/inventories', inventoryRouter);
+router.use('/images', imageRouter);
 
 export default router;

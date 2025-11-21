@@ -58,15 +58,13 @@ export default function HeroSection() {
           </div>
 
           <div className="relative w-full h-96 md:h-full min-h-96 bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl overflow-hidden flex items-center justify-center border border-border">
-            <div className="absolute inset-0">
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center">
-                  <Leaf className="w-24 h-24 text-primary/30 mx-auto mb-4" />
-                  <p className="text-foreground/40 font-medium">3D Spline Scene Ready</p>
-                  <p className="text-foreground/30 text-sm">Add your Spline component here</p>
-                </div>
-              </div>
-            </div>
+            <img 
+              src="/sustainability-hero.jpg" 
+              alt="Sustainable food management with recycling symbols and eco-friendly home" 
+              className="w-full h-full object-cover object-center"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent" />
           </div>
         </div>
       </div>
