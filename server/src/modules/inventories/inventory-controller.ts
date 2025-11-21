@@ -350,7 +350,7 @@ export class InventoryController {
         res.status(400).json({ error: 'Quantity is required and must be greater than 0' });
         return;
       }
-
+      
       const consumptionLog = await this.inventoryService.logConsumption(userId, {
         inventoryId,
         inventoryItemId,
@@ -361,7 +361,7 @@ export class InventoryController {
         consumedAt: consumedAt ? new Date(consumedAt) : undefined,
         notes,
       });
-
+      
       res.status(201).json(consumptionLog);
     } catch (error) {
       console.error('Error logging consumption:', error);
@@ -389,6 +389,10 @@ export class InventoryController {
       const userId = req.auth?.userId;
       const { startDate, endDate, inventoryId } = req.query;
       
+      console.log('=== CONSUMPTION LOGS CONTROLLER ===');
+      console.log('User ID:', userId);
+      console.log('Filters:', { startDate, endDate, inventoryId });
+      
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -408,10 +412,13 @@ export class InventoryController {
         filters.inventoryId = inventoryId as string;
       }
 
-      const consumptionLogs = await this.inventoryService.getConsumptionLogs(filters, userId);
+      const consumptionLogs = await this.inventoryService.getConsumptionLogs(userId, filters);
+      console.log('Returning', consumptionLogs.length, 'consumption logs');
+      console.log('=== END CONTROLLER ===');
+      
       res.status(200).json({ consumptionLogs });
     } catch (error) {
-      console.error('Error getting consumption logs:', error);
+      console.error('ERROR in getConsumptionLogs controller:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   };
