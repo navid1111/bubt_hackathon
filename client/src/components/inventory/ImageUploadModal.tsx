@@ -1,6 +1,13 @@
-import { useState, useRef } from 'react';
-import { Upload, X, Camera, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
+import {
+  AlertCircle,
+  Camera,
+  CheckCircle,
+  Loader2,
+  Upload,
+  X,
+} from 'lucide-react';
+import { useRef, useState } from 'react';
 
 interface ImageUploadModalProps {
   inventoryId: string;
@@ -8,7 +15,11 @@ interface ImageUploadModalProps {
   onSuccess: (extractedItems: any[]) => void;
 }
 
-export default function ImageUploadModal({ inventoryId, onClose, onSuccess }: ImageUploadModalProps) {
+export default function ImageUploadModal({
+  inventoryId,
+  onClose,
+  onSuccess,
+}: ImageUploadModalProps) {
   const { getToken } = useAuth(); // Move this to component level
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -50,7 +61,7 @@ export default function ImageUploadModal({ inventoryId, onClose, onSuccess }: Im
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
       const event = {
-        target: { files: [file] }
+        target: { files: [file] },
       } as unknown as React.ChangeEvent<HTMLInputElement>;
       handleFileSelect(event);
     }
@@ -69,53 +80,39 @@ export default function ImageUploadModal({ inventoryId, onClose, onSuccess }: Im
     try {
       const formData = new FormData();
       formData.append('image', selectedFile);
-      formData.append('inventoryId', inventoryId);
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      
-      // Get Clerk token - now using the hook from component level
+      const API_URL =
+        import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+      // Get Clerk token
       const token = await getToken();
 
-      // Upload image
-      const uploadResponse = await fetch(`${API_URL}/images`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload image');
-      }
-
-      const uploadResult = await uploadResponse.json();
       setUploadComplete(true);
       setUploading(false);
       setProcessing(true);
 
-      // TODO: In next phase, call OCR/AI extraction API
-      // For now, show success and close modal
-      setTimeout(() => {
-        setProcessing(false);
-        // Mock extracted items - replace with actual API response
-        const mockExtractedItems = [
-          {
-            name: 'Sample Item 1',
-            quantity: 2,
-            unit: 'kg',
-            selected: true
+      // Call OCR endpoint to extract and add items
+      const ocrResponse = await fetch(
+        `${API_URL}/inventories/${inventoryId}/items/from-image`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-          {
-            name: 'Sample Item 2',
-            quantity: 1,
-            unit: 'liter',
-            selected: true
-          }
-        ];
-        onSuccess(mockExtractedItems);
-      }, 2000);
+          body: formData,
+        },
+      );
 
+      if (!ocrResponse.ok) {
+        const errorData = await ocrResponse.json();
+        throw new Error(errorData.error || 'Failed to process image');
+      }
+
+      const result = await ocrResponse.json();
+      setProcessing(false);
+
+      // Show success with the extracted items
+      onSuccess(result.addedItems || []);
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.message || 'Failed to upload image');
@@ -144,8 +141,12 @@ export default function ImageUploadModal({ inventoryId, onClose, onSuccess }: Im
               <Camera className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-foreground">Scan Receipt or Food Items</h2>
-              <p className="text-sm text-foreground/70">Upload an image to extract items automatically</p>
+              <h2 className="text-xl font-bold text-foreground">
+                Scan Receipt or Food Items
+              </h2>
+              <p className="text-sm text-foreground/70">
+                Upload an image to extract items automatically
+              </p>
             </div>
           </div>
           <button
@@ -213,7 +214,9 @@ export default function ImageUploadModal({ inventoryId, onClose, onSuccess }: Im
               {/* File Info */}
               <div className="flex items-center justify-between p-4 bg-secondary/10 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-foreground">{selectedFile?.name}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {selectedFile?.name}
+                  </p>
                   <p className="text-xs text-foreground/70">
                     {((selectedFile?.size || 0) / 1024 / 1024).toFixed(2)} MB
                   </p>
@@ -238,10 +241,14 @@ export default function ImageUploadModal({ inventoryId, onClose, onSuccess }: Im
             <div className="p-6 bg-primary/5 rounded-xl text-center">
               <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-3" />
               <p className="font-medium text-foreground mb-1">
-                {uploading ? 'Uploading image...' : 'Extracting items from image...'}
+                {uploading
+                  ? 'Uploading image...'
+                  : 'Extracting items from image...'}
               </p>
               <p className="text-sm text-foreground/70">
-                {uploading ? 'Please wait while we upload your image' : 'Analyzing the receipt...'}
+                {uploading
+                  ? 'Please wait while we upload your image'
+                  : 'Analyzing the receipt...'}
               </p>
             </div>
           )}

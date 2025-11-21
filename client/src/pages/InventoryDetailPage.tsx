@@ -1,23 +1,24 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  AlertCircle,
+  Apple,
   ArrowLeft,
+  Calendar,
+  Camera,
+  FileText,
+  Filter,
+  Hash,
   Package,
   Plus,
   Search,
-  AlertCircle,
-  Filter,
-  X,
-  Apple,
-  Calendar,
-  Hash,
-  FileText,
   Trash2,
-  Camera,
   Utensils,
+  X,
 } from 'lucide-react';
-import { useInventory } from '../hooks/useInventory';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import ImageUploadModal from '../components/inventory/ImageUploadModal';
+import { useInventory } from '../hooks/useInventory';
 
 export interface Inventory {
   id: string;
@@ -64,6 +65,7 @@ export default function InventoryDetailPage() {
   // Rest of the states
   const { inventoryId } = useParams<{ inventoryId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,10 +124,12 @@ export default function InventoryDetailPage() {
 
   // Handle image upload success
   const handleImageUploadSuccess = (extractedItems: any[]) => {
-    console.log('Extracted items:', extractedItems);
-    // TODO: Show review modal with extracted items
+    console.log('OCR items added successfully:', extractedItems);
     setShowImageUploadModal(false);
-    // For now, you can show the AddItemModal or create a ReviewExtractedItemsModal
+    // Refresh the inventory data
+    queryClient.invalidateQueries({
+      queryKey: ['inventory-items', inventoryId],
+    });
   };
 
   if (isLoading || loading) {
@@ -314,9 +318,13 @@ export default function InventoryDetailPage() {
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg text-foreground">{inventory.name}</h1>
+              <h1 className="font-bold text-lg text-foreground">
+                {inventory.name}
+              </h1>
               {inventory.description && (
-                <p className="text-sm text-foreground/70">{inventory.description}</p>
+                <p className="text-sm text-foreground/70">
+                  {inventory.description}
+                </p>
               )}
             </div>
           </div>
@@ -362,17 +370,16 @@ export default function InventoryDetailPage() {
               <div>
                 <p className="text-sm text-foreground/70">Expiring Soon</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {
-                    inventoryItems?.filter(item => {
-                      if (!item.expiryDate) return false;
-                      const expDate = new Date(item.expiryDate);
-                      const today = new Date();
-                      const diffDays = Math.ceil(
-                        (expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-                      );
-                      return diffDays >= 0 && diffDays <= 3;
-                    }).length || 0
-                  }
+                  {inventoryItems?.filter(item => {
+                    if (!item.expiryDate) return false;
+                    const expDate = new Date(item.expiryDate);
+                    const today = new Date();
+                    const diffDays = Math.ceil(
+                      (expDate.getTime() - today.getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    );
+                    return diffDays >= 0 && diffDays <= 3;
+                  }).length || 0}
                 </p>
               </div>
             </div>
@@ -390,7 +397,7 @@ export default function InventoryDetailPage() {
             <Plus className="w-5 h-5 text-primary" />
             <span className="font-medium text-primary">Add Manually</span>
           </button>
-          
+
           <button
             onClick={() => setShowImageUploadModal(true)}
             className="flex-1 px-4 py-3 bg-gradient-to-r from-primary to-primary/80 
@@ -398,7 +405,7 @@ export default function InventoryDetailPage() {
                        transition-smooth flex items-center justify-center gap-2"
           >
             <Camera className="w-5 h-5" />
-            <span className="font-medium">Scan Receipt</span>
+            <span className="font-medium">Smart OCR Scan</span>
           </button>
         </div>
 
@@ -440,7 +447,10 @@ export default function InventoryDetailPage() {
                   <select
                     value={filters.category}
                     onChange={e =>
-                      setFilters(prev => ({ ...prev, category: e.target.value }))
+                      setFilters(prev => ({
+                        ...prev,
+                        category: e.target.value,
+                      }))
                     }
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
                   >
@@ -461,13 +471,18 @@ export default function InventoryDetailPage() {
                   <select
                     value={filters.expiryStatus}
                     onChange={e =>
-                      setFilters(prev => ({ ...prev, expiryStatus: e.target.value }))
+                      setFilters(prev => ({
+                        ...prev,
+                        expiryStatus: e.target.value,
+                      }))
                     }
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
                   >
                     <option value="">All Status</option>
                     <option value="expired">Expired</option>
-                    <option value="expiring-soon">Expiring Soon (≤3 days)</option>
+                    <option value="expiring-soon">
+                      Expiring Soon (≤3 days)
+                    </option>
                     <option value="fresh">Fresh (&gt;3 days)</option>
                     <option value="no-expiry">No Expiry Date</option>
                   </select>
@@ -481,7 +496,10 @@ export default function InventoryDetailPage() {
                   <select
                     value={filters.stockLevel}
                     onChange={e =>
-                      setFilters(prev => ({ ...prev, stockLevel: e.target.value }))
+                      setFilters(prev => ({
+                        ...prev,
+                        stockLevel: e.target.value,
+                      }))
                     }
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground"
                   >
@@ -516,7 +534,9 @@ export default function InventoryDetailPage() {
           <div className="text-center py-12 bg-card rounded-xl border border-border">
             <Package className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">
-              {hasActiveFilters ? 'No items match your filters' : 'No items yet'}
+              {hasActiveFilters
+                ? 'No items match your filters'
+                : 'No items yet'}
             </h3>
             <p className="text-foreground/60 mb-4">
               {hasActiveFilters
@@ -535,13 +555,17 @@ export default function InventoryDetailPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredItems.map(item => {
-              const itemName = item.customName || item.foodItem?.name || 'Unknown Item';
+              const itemName =
+                item.customName || item.foodItem?.name || 'Unknown Item';
               const category = item.foodItem?.category || 'custom';
-              const expiryDate = item.expiryDate ? new Date(item.expiryDate) : null;
+              const expiryDate = item.expiryDate
+                ? new Date(item.expiryDate)
+                : null;
               const today = new Date();
               const daysUntilExpiry = expiryDate
                 ? Math.ceil(
-                    (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                    (expiryDate.getTime() - today.getTime()) /
+                      (1000 * 60 * 60 * 24),
                   )
                 : null;
 
@@ -567,8 +591,12 @@ export default function InventoryDetailPage() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground mb-1">{itemName}</h3>
-                      <p className="text-sm text-foreground/70 capitalize">{category}</p>
+                      <h3 className="font-semibold text-foreground mb-1">
+                        {itemName}
+                      </h3>
+                      <p className="text-sm text-foreground/70 capitalize">
+                        {category}
+                      </p>
                     </div>
                     <button
                       onClick={() => handleConsumption(item)}
@@ -602,7 +630,9 @@ export default function InventoryDetailPage() {
                     {item.notes && (
                       <div className="flex items-start gap-2 text-sm">
                         <FileText className="w-4 h-4 text-foreground/40 mt-0.5" />
-                        <span className="text-foreground/70 text-xs">{item.notes}</span>
+                        <span className="text-foreground/70 text-xs">
+                          {item.notes}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -656,7 +686,7 @@ export default function InventoryDetailPage() {
         />
       )}
 
-      {/* Image Upload Modal */}
+      {/* Smart OCR Upload Modal */}
       {showImageUploadModal && (
         <ImageUploadModal
           inventoryId={inventoryId!}
@@ -895,7 +925,8 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
   useEffect(() => {
     const fetchFoodItems = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const API_URL =
+          import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
         const response = await fetch(`${API_URL}/foods`);
         const data = await response.json();
         setFoodItems(data.data || []);
@@ -983,7 +1014,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
     <div className="fixed inset-0 bg-background/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
       <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-foreground">Add Item to Inventory</h2>
+          <h2 className="text-xl font-bold text-foreground">
+            Add Item to Inventory
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-secondary/20 rounded-lg transition-smooth"
@@ -1002,7 +1035,10 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
               onChange={handleChange}
               className="w-4 h-4 text-primary border-border rounded focus:ring-2 focus:ring-primary"
             />
-            <label htmlFor="useCustomItem" className="text-sm font-medium text-foreground">
+            <label
+              htmlFor="useCustomItem"
+              className="text-sm font-medium text-foreground"
+            >
               Add custom item (not in database)
             </label>
           </div>
@@ -1028,7 +1064,9 @@ function AddItemModal({ onClose, onAdd }: AddItemModalProps) {
                 Select Food Item <span className="text-red-500">*</span>
               </label>
               {loadingFoodItems ? (
-                <p className="text-sm text-foreground/60">Loading food items...</p>
+                <p className="text-sm text-foreground/60">
+                  Loading food items...
+                </p>
               ) : (
                 <select
                   name="selectedFoodItemId"
