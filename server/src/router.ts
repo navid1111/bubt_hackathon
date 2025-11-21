@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 
+import adminRouter from './modules/admin/admin-router';
 import { foodRouter } from './modules/foods/food-router';
 import { imageRouter } from './modules/images/image-router';
 import { inventoryRouter } from './modules/inventories/inventory-router';
@@ -29,5 +30,8 @@ router.use('/resources', resourcesRouter);
 router.use('/users', usersRouter);
 router.use('/inventories', inventoryRouter);
 router.use('/images', imageRouter);
+
+// Admin routes (require admin role)
+router.use('/admin', adminRouter);
 
 export default router;
