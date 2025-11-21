@@ -14,6 +14,7 @@ import {
   FileText,
   Trash2,
   Camera,
+  Utensils,
 } from 'lucide-react';
 import { useInventory } from '../hooks/useInventory';
 import ImageUploadModal from '../components/inventory/ImageUploadModal';
