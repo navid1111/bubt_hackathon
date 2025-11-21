@@ -433,29 +433,78 @@ async function main() {
     console.log(`Seeded resource with ID: ${createdResource.id}`);
   }
 
-  // Create sample user
-  const user = await prisma.user.upsert({
-    where: { clerkId: 'user_123' },
-    update: {},
-    create: {
-      clerkId: 'user_123',
-      email: 'demo@example.com',
-    },
-  });
+  // Fetch actual users from DB
+  const users = await prisma.user.findMany();
+  if (users.length === 0) {
+    console.log('No users found in database. Please seed users first.');
+    return;
+  }
+  console.log(`Fetched users: ${users.map(u => u.id).join(', ')}`);
 
-  console.log(`Seeded user with ID: ${user.id}`);
+  // Get all food items for inventory seeding
+  const foodItemsDb = await prisma.foodItem.findMany();
 
-  // Create inventory for the user
-  const inventory = await prisma.inventory.create({
-    data: {
-      name: 'Home Inventory',
-      description: 'Main home food inventory',
-      isPrivate: false,
-      createdById: user.id,
-    },
-  });
+  // For each user, create 2-3 inventories, each with 15-20 items
+  for (const user of users) {
+    const inventoryCount = Math.floor(Math.random() * 2) + 2; // 2 or 3
+    for (let i = 0; i < inventoryCount; i++) {
+      const inventory = await prisma.inventory.create({
+        data: {
+          name: `Inventory ${i + 1} for ${user.email}`,
+          description: `Auto-seeded inventory #${i + 1}`,
+          isPrivate: false,
+          createdById: user.id,
+        },
+      });
+      console.log(`Seeded inventory ${inventory.name} for user ${user.email}`);
 
-  console.log(`Seeded inventory with ID: ${inventory.id}`);
+      // Add 15-20 inventory items
+      const itemCount = Math.floor(Math.random() * 6) + 15; // 15-20
+      const usedFoodItems = new Set<string>();
+      for (let j = 0; j < itemCount; j++) {
+        // Pick a random food item not already used in this inventory
+        let foodItem;
+        do {
+          foodItem = foodItemsDb[Math.floor(Math.random() * foodItemsDb.length)];
+        } while (usedFoodItems.has(foodItem.id));
+        usedFoodItems.add(foodItem.id);
+
+        const quantity = Math.floor(Math.random() * 10) + 1;
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + (foodItem.typicalExpirationDays || 7));
+
+        const inventoryItem = await prisma.inventoryItem.create({
+          data: {
+            inventoryId: inventory.id,
+            foodItemId: foodItem.id,
+            customName: foodItem.name,
+            quantity,
+            unit: foodItem.unit,
+            expiryDate,
+            addedById: user.id,
+          },
+        });
+
+        // Seed consumption log for this item
+        if (Math.random() < 0.7) { // 70% chance to log consumption
+          const consumedQty = Math.floor(Math.random() * quantity) + 1;
+          await prisma.consumptionLog.create({
+            data: {
+              inventoryId: inventory.id,
+              inventoryItemId: inventoryItem.id,
+              consumedById: null,
+              foodItemId: foodItem.id,
+              itemName: foodItem.name,
+              quantity: consumedQty,
+              unit: foodItem.unit,
+              consumedAt: new Date(),
+              notes: 'Auto-seeded consumption',
+            },
+          });
+        }
+      }
+    }
+  }
 
   console.log('Database seeding completed!');
 }
