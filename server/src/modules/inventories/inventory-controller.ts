@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import { UploadedFile } from 'express-fileupload';
+import { imageService } from '../images/image-service';
 import { InventoryService } from './inventory-service';
 import {
   ConsumptionLogFilters,
@@ -220,6 +222,111 @@ export class InventoryController {
       } else {
         res.status(500).json({ error: 'Internal server error' });
       }
+    }
+  };
+
+  // Add items to inventory from image using OCR
+  addItemsFromImage = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.auth?.userId;
+      const { inventoryId } = req.params;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!inventoryId) {
+        res.status(400).json({ error: 'Inventory ID is required' });
+        return;
+      }
+
+      // Check if image file is provided
+      if (!req.files || !req.files.image) {
+        res.status(400).json({ error: 'No image file provided' });
+        return;
+      }
+
+      const imageFile = req.files.image as UploadedFile;
+
+      // Upload image and extract text using OCR
+      console.log(
+        '🖼️ [Controller] Processing image for inventory:',
+        inventoryId,
+      );
+      const result = await imageService.uploadImageWithOCR(imageFile, userId, {
+        inventoryId,
+        extractItems: true,
+      });
+
+      if (!result.ocr) {
+        res.status(500).json({ error: 'Failed to extract text from image' });
+        return;
+      }
+
+      // Add extracted items to inventory
+      const addedItems = [];
+      const errors = [];
+
+      for (const extractedItem of result.ocr.extractedItems) {
+        try {
+          console.log(
+            '➕ [Controller] Adding item to inventory:',
+            extractedItem.name,
+          );
+
+          const newItem = await this.inventoryService.addInventoryItem(
+            userId,
+            inventoryId,
+            {
+              customName: extractedItem.name,
+              quantity: extractedItem.quantity || 1,
+              unit: extractedItem.unit || 'pcs',
+              notes: `Added from image OCR (confidence: ${Math.round(
+                (extractedItem.confidence || 0.6) * 100,
+              )}%)`,
+            },
+          );
+
+          addedItems.push({
+            ...newItem,
+            originalOCR: extractedItem,
+          });
+        } catch (error) {
+          console.error(
+            '❌ [Controller] Error adding item:',
+            extractedItem.name,
+            error,
+          );
+          errors.push({
+            item: extractedItem.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        message: `Successfully processed image. Added ${addedItems.length} items.`,
+        data: {
+          image: result.file,
+          ocrText: result.ocr.text,
+          ocrConfidence: result.ocr.confidence,
+          addedItems,
+          errors: errors.length > 0 ? errors : undefined,
+          summary: {
+            totalExtracted: result.ocr.extractedItems.length,
+            successfullyAdded: addedItems.length,
+            failed: errors.length,
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error processing image for inventory:', error);
+      res.status(500).json({
+        error: 'Failed to process image',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   };
 

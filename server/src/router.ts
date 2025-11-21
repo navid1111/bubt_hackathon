@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express';
 
+import { foodRouter } from './modules/foods/food-router';
+import { imageRouter } from './modules/images/image-router';
+import { inventoryRouter } from './modules/inventories/inventory-router';
 import { resourcesRouter } from './modules/resources/resources-router';
 import { usersRouter } from './modules/users/users-router';
-import { foodRouter } from './modules/foods/food-router';
-import { inventoryRouter } from './modules/inventories/inventory-router';
-import { imageRouter } from './modules/images/image-router';
 const router = express.Router();
 
 router.get('/', (req: Request, res: Response) => {
